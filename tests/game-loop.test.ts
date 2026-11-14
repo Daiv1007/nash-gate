@@ -6,7 +6,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runRound, runTournament } from '../src/engine/index.ts';
+import { runRound, runTournament, type GameLoopErrorContext } from '../src/engine/index.ts';
 import { MockAdapter, type ProblemContext } from '../src/adapters/index.ts';
 import { createAgent, type Agent } from '../src/core/index.ts';
 
@@ -257,4 +257,86 @@ test('runTournament: Early halting when all generators go bankrupt', async () =>
   assert.equal(tournamentResult.bankruptAgents.length, 1);
   assert.equal(tournamentResult.bankruptAgents[0].id, 'BuggyGen');
   assert.ok(tournamentResult.terminationReason.includes('GENERATOR agents are BANKRUPT'));
+});
+
+// ---------------------------------------------------------------------------
+// 3. Error Telemetry Hook Tests (onError)
+// ---------------------------------------------------------------------------
+
+test('runRound: onError hook triggers when adapter generateProposal throws', async () => {
+  const gen = createAgent({ id: 'AlphaGen', role: 'GENERATOR', model: 'faulty', capital: 100 });
+  const aud = createAgent({ id: 'SharpAuditor', role: 'AUDITOR', model: 'sharp', capital: 100 });
+  const agentMap = new Map<string, Agent>([
+    [gen.id, gen],
+    [aud.id, aud],
+  ]);
+
+  const faultyAdapter = new MockAdapter({
+    proposalHandler: () => {
+      throw new Error('404 Model Not Found: gemini-faulty');
+    },
+  });
+
+  const capturedErrors: { error: Error; context: GameLoopErrorContext }[] = [];
+
+  const roundResult = await runRound({
+    roundNumber: 1,
+    problem: problem1,
+    agents: agentMap,
+    getAdapter: () => faultyAdapter,
+    hooks: {
+      onError: (error, context) => {
+        capturedErrors.push({ error, context });
+      },
+    },
+  });
+
+  assert.equal(capturedErrors.length, 1);
+  assert.ok(capturedErrors[0].error.message.includes('404 Model Not Found'));
+  assert.equal(capturedErrors[0].context.phase, 'proposal');
+  assert.equal(capturedErrors[0].context.agent.id, 'AlphaGen');
+  assert.equal(capturedErrors[0].context.roundNumber, 1);
+  assert.equal(capturedErrors[0].context.problem.id, 'is-palindrome');
+
+  // No valid proposals generated due to error
+  assert.equal(roundResult.proposals.length, 0);
+});
+
+test('runRound: onError hook triggers when adapter generateChallenge throws', async () => {
+  const gen = createAgent({ id: 'SolidGen', role: 'GENERATOR', model: 'solid', capital: 100 });
+  const aud = createAgent({ id: 'BrokenAuditor', role: 'AUDITOR', model: 'broken', capital: 100 });
+  const agentMap = new Map<string, Agent>([
+    [gen.id, gen],
+    [aud.id, aud],
+  ]);
+
+  const faultyAdapter = new MockAdapter({
+    challengeHandler: () => {
+      throw new Error('Connection refused to Ollama at 11434');
+    },
+  });
+
+  const capturedErrors: { error: Error; context: GameLoopErrorContext }[] = [];
+
+  const roundResult = await runRound({
+    roundNumber: 2,
+    problem: problem2,
+    agents: agentMap,
+    getAdapter: () => faultyAdapter,
+    hooks: {
+      onError: (error, context) => {
+        capturedErrors.push({ error, context });
+      },
+    },
+  });
+
+  assert.equal(capturedErrors.length, 1);
+  assert.ok(capturedErrors[0].error.message.includes('Connection refused'));
+  assert.equal(capturedErrors[0].context.phase, 'challenge');
+  assert.equal(capturedErrors[0].context.agent.id, 'BrokenAuditor');
+  assert.equal(capturedErrors[0].context.targetGenerator?.id, 'SolidGen');
+  assert.equal(capturedErrors[0].context.roundNumber, 2);
+
+  // Challenge failed with error -> no valid challenges lodged
+  assert.equal(roundResult.challenges.length, 0);
 });

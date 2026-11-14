@@ -46,6 +46,17 @@ export interface RoundResult {
 }
 
 /**
+ * Context provided when an adapter or game loop error occurs.
+ */
+export interface GameLoopErrorContext {
+  readonly phase: 'proposal' | 'challenge';
+  readonly agent: Agent;
+  readonly targetGenerator?: Agent;
+  readonly problem: ProblemContext;
+  readonly roundNumber: number;
+}
+
+/**
  * Lifecycle hook callbacks enabling rich terminal logging, telemetry, or custom UI streaming.
  */
 export interface GameLoopHooks {
@@ -74,6 +85,7 @@ export interface GameLoopHooks {
   onBankruptcy?: (agent: Agent, roundNumber: number) => void | Promise<void>;
   onRoundEnd?: (result: RoundResult) => void | Promise<void>;
   onTournamentEnd?: (result: TournamentResult) => void | Promise<void>;
+  onError?: (error: Error, context: GameLoopErrorContext) => void | Promise<void>;
 }
 
 /**
@@ -182,6 +194,13 @@ export async function runRound(params: RunRoundParams): Promise<RoundResult> {
         await hooks?.onProposalRejected?.(generator, validation.errors);
       }
     } catch (err: any) {
+      const errorObj = err instanceof Error ? err : new Error(String(err));
+      await hooks?.onError?.(errorObj, {
+        phase: 'proposal',
+        agent: generator,
+        problem,
+        roundNumber,
+      });
       await hooks?.onProposalRejected?.(generator, [
         `Adapter generation failed: ${err?.message || String(err)}`,
       ]);
@@ -238,6 +257,14 @@ export async function runRound(params: RunRoundParams): Promise<RoundResult> {
           await hooks?.onChallengeRejected?.(auditor, errors);
         }
       } catch (err: any) {
+        const errorObj = err instanceof Error ? err : new Error(String(err));
+        await hooks?.onError?.(errorObj, {
+          phase: 'challenge',
+          agent: auditor,
+          targetGenerator,
+          problem,
+          roundNumber,
+        });
         await hooks?.onChallengeRejected?.(auditor, [
           `Adapter audit failed: ${err?.message || String(err)}`,
         ]);

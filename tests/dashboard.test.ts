@@ -163,4 +163,68 @@ describe('DashboardServer & Web Visualizer', () => {
     assert.ok(snapshot.lastResult);
     assert.equal(snapshot.lastResult.totalRoundsPlayed, 3);
   });
+
+  it('createInitialAgents(true) dynamically resolves model for all agents based on env', () => {
+    const originalEnv = { ...process.env };
+    try {
+      // Test 1: Gemini AIza key
+      delete process.env.LLM_MODEL;
+      process.env.LLM_API_KEY = 'AIzaSyTestKey123';
+      const geminiAgents = createInitialAgents(true);
+      assert.equal(geminiAgents.length, 4);
+      for (const a of geminiAgents) {
+        assert.equal(a.model, 'gemini-2.5-flash');
+      }
+
+      // Test 2: Ollama 11434 url
+      delete process.env.LLM_API_KEY;
+      delete process.env.GEMINI_API_KEY;
+      process.env.LLM_BASE_URL = 'http://localhost:11434/v1';
+      const ollamaAgents = createInitialAgents(true);
+      for (const a of ollamaAgents) {
+        assert.equal(a.model, 'llama3.2');
+      }
+
+      // Test 3: Explicit LLM_MODEL override
+      process.env.LLM_MODEL = 'deepseek-coder:6.7b';
+      const customAgents = createInitialAgents(true);
+      for (const a of customAgents) {
+        assert.equal(a.model, 'deepseek-coder:6.7b');
+      }
+    } finally {
+      process.env = originalEnv;
+    }
+  });
+
+  it('DashboardServer broadcasts engine:error event on adapter failure', () => {
+    const server = new DashboardServer({ paceMs: 1 });
+    const writes: string[] = [];
+
+    const mockRes: any = new EventEmitter();
+    mockRes.write = (chunk: string) => {
+      writes.push(chunk);
+      return true;
+    };
+
+    const mockReq: any = new EventEmitter();
+    mockReq.url = '/events';
+    mockReq.method = 'GET';
+    mockReq.headers = { host: 'localhost:3000' };
+
+    mockRes.writeHead = () => {};
+    (server as any).handleRequest(mockReq, mockRes);
+
+    // Simulate broadcasting engine:error
+    server.broadcast('engine:error', {
+      error: '404 Model Not Found',
+      phase: 'proposal',
+      agent: { id: 'AlphaGen', model: 'gemini-2.5-flash' },
+      roundNumber: 1,
+    });
+
+    const errorEvent = writes.find((w) => w.includes('event: engine:error'));
+    assert.ok(errorEvent);
+    assert.ok(errorEvent.includes('404 Model Not Found'));
+    assert.ok(errorEvent.includes('gemini-2.5-flash'));
+  });
 });

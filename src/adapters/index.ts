@@ -23,5 +23,7 @@ export {
 export {
   OpenAICompatibleAdapter,
   extractJsonFromText,
+  resolveDefaultModel,
+  isLiveMode,
   type OpenAICompatibleAdapterConfig,
 } from './openai-compatible.ts';

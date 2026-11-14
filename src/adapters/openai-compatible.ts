@@ -18,6 +18,41 @@ import type {
 } from './types.ts';
 
 /**
+ * Resolves the default LLM model name dynamically based on environment variables:
+ * 1. If process.env.LLM_MODEL is set, use that exact model name.
+ * 2. Else if process.env.LLM_API_KEY starts with 'AIza', default to 'gemini-2.5-flash'.
+ * 3. Else if process.env.LLM_BASE_URL includes '11434' (Ollama), default to 'llama3.2'.
+ * 4. Otherwise fallback to 'gpt-4o-mini'.
+ */
+export function resolveDefaultModel(): string {
+  if (process.env.LLM_MODEL && process.env.LLM_MODEL.trim()) {
+    return process.env.LLM_MODEL.trim();
+  }
+  const apiKey = process.env.LLM_API_KEY ?? process.env.GEMINI_API_KEY;
+  if (apiKey && apiKey.startsWith('AIza')) {
+    return 'gemini-2.5-flash';
+  }
+  const baseUrl = process.env.LLM_BASE_URL;
+  if (baseUrl && baseUrl.includes('11434')) {
+    return 'llama3.2';
+  }
+  return 'gpt-4o-mini';
+}
+
+/**
+ * Detects whether a live LLM endpoint is configured via environment variables.
+ */
+export function isLiveMode(): boolean {
+  return Boolean(
+    process.env.LLM_API_KEY ||
+    process.env.LLM_BASE_URL ||
+    process.env.LLM_MODEL ||
+    process.env.OPENAI_API_KEY ||
+    process.env.GEMINI_API_KEY
+  );
+}
+
+/**
  * Robustly parses and extracts a JSON object from raw model output.
  * Handles bare JSON, markdown-fenced JSON, and JSON embedded in surrounding text.
  *
@@ -128,7 +163,7 @@ export class OpenAICompatibleAdapter implements AgentAdapter {
       this.baseUrl = 'http://localhost:11434/v1';
     }
 
-    this.defaultModel = config?.model ?? process.env.LLM_MODEL ?? 'gpt-4o-mini';
+    this.defaultModel = config?.model ?? resolveDefaultModel();
     this.temperature = config?.temperature ?? 0.2;
     this.timeoutMs = config?.timeoutMs ?? 30_000;
     this.fetchFn = config?.fetchFn ?? globalThis.fetch;

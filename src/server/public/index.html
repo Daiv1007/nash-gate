@@ -1029,7 +1029,7 @@
       es.addEventListener('state:init', (e) => {
         const data = JSON.parse(e.data);
         engineModeBadge.textContent = data.adapterMode === 'live-llm' 
-          ? '⚡ Live OpenAI API' 
+          ? `⚡ Live LLM (${data.resolvedModel || 'OpenAI-Compatible'})` 
           : '🤖 Offline Mock Catalog';
         
         if (data.agents && data.agents.length > 0) {
@@ -1042,6 +1042,9 @@
       es.addEventListener('tournament:start', (e) => {
         const data = JSON.parse(e.data);
         setRunningState(true);
+        if (data.resolvedModel) {
+          engineModeBadge.textContent = `⚡ Live LLM (${data.resolvedModel})`;
+        }
         oraclePassedCount = 0;
         oracleFailedCount = 0;
         updateOracleMetrics();
@@ -1331,6 +1334,54 @@
       es.addEventListener('tournament:state', (e) => {
         const data = JSON.parse(e.data);
         setRunningState(data.isRunning);
+      });
+
+      // 12. Adapter & Engine Error Telemetry
+      es.addEventListener('engine:error', (e) => {
+        const data = JSON.parse(e.data);
+        const agentName = data.agent ? data.agent.id : 'Agent';
+        const phaseName = data.phase === 'proposal' ? 'Proposal Generation' : 'Auditor Challenge';
+        const target = data.targetGenerator ? ` vs ${data.targetGenerator.id}` : '';
+        const modelName = data.agent?.model || 'Unknown Model';
+
+        appendEventCard({
+          type: 'error',
+          badgeText: '⚠️ ADAPTER ERROR',
+          badgeClass: 'event-badge-fail',
+          title: `${agentName}${target} — ${phaseName} Failed`,
+          body: `
+            <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+              <span class="badge" style="background: rgba(244, 63, 94, 0.2); color: var(--rose); border: 1px solid var(--rose);">
+                ${escapeHtml(modelName)}
+              </span>
+              <span style="font-size: 0.75rem; color: var(--text-dim); font-family: var(--font-mono);">
+                Round ${data.roundNumber || currentRound}
+              </span>
+            </div>
+            <div class="code-box" style="color: var(--rose); border-color: rgba(244, 63, 94, 0.4);">
+              ${escapeHtml(data.error || 'Adapter request failed')}
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 6px;">
+              Adapter exception was caught and logged. Check endpoint connectivity, API keys, or model availability.
+            </p>
+          `
+        });
+      });
+
+      // 13. Tournament-level Fatal Error
+      es.addEventListener('tournament:error', (e) => {
+        const data = JSON.parse(e.data);
+        appendEventCard({
+          type: 'error',
+          badgeText: '⚠️ TOURNAMENT ERROR',
+          badgeClass: 'event-badge-fail',
+          title: 'Tournament Execution Error',
+          body: `
+            <div class="code-box" style="color: var(--rose); border-color: rgba(244, 63, 94, 0.4);">
+              ${escapeHtml(data.message || 'Execution halted')}
+            </div>
+          `
+        });
       });
     }
 

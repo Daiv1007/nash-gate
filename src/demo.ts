@@ -9,6 +9,8 @@ import { createAgent, type Agent } from './core/index.ts';
 import {
   MockAdapter,
   OpenAICompatibleAdapter,
+  resolveDefaultModel,
+  isLiveMode,
   type AgentAdapter,
   type ProblemContext,
 } from './adapters/index.ts';
@@ -95,20 +97,21 @@ ${c.cyan}╔══════════════════════�
 `);
 
   // Detect Adapter Configuration
-  const apiKey = process.env.LLM_API_KEY;
+  const isLive = isLiveMode();
+  const liveModel = resolveDefaultModel();
   let adapter: AgentAdapter;
 
-  if (apiKey) {
+  if (isLive) {
     console.log(
-      `${c.green}⚡ Adapter:${c.reset} ${c.bold}OpenAICompatibleAdapter${c.reset} (Live API key detected via LLM_API_KEY)`
+      `${c.green}⚡ Adapter:${c.reset} ${c.bold}OpenAICompatibleAdapter${c.reset} (Model: ${c.cyan}${liveModel}${c.reset})`
     );
-    adapter = new OpenAICompatibleAdapter({ apiKey });
+    adapter = new OpenAICompatibleAdapter({ model: liveModel });
   } else {
     console.log(
       `${c.magenta}⚡ Adapter:${c.reset} ${c.bold}MockAdapter${c.reset} (Deterministic Offline Mode - Zero API keys required)`
     );
     console.log(
-      `${c.gray}   Tip: Set process.env.LLM_API_KEY to test against live Ollama/Gemini/OpenAI endpoints.${c.reset}\n`
+      `${c.gray}   Tip: Set process.env.LLM_API_KEY (for Gemini/OpenAI) or process.env.LLM_BASE_URL (for Ollama) to test against live endpoints.${c.reset}\n`
     );
     adapter = new MockAdapter();
   }
@@ -118,25 +121,25 @@ ${c.cyan}╔══════════════════════�
     createAgent({
       id: 'AlphaGen',
       role: 'GENERATOR',
-      model: apiKey ? 'gpt-4o-mini' : 'deterministic-solid',
+      model: isLive ? liveModel : 'deterministic-solid',
       capital: 100,
     }),
     createAgent({
       id: 'BuggyGen',
       role: 'GENERATOR',
-      model: apiKey ? 'llama-3-8b' : 'heuristic-naive',
+      model: isLive ? liveModel : 'heuristic-naive',
       capital: 100,
     }),
     createAgent({
       id: 'SharpAuditor',
       role: 'AUDITOR',
-      model: apiKey ? 'claude-3-5-sonnet' : 'adversarial-verifier',
+      model: isLive ? liveModel : 'adversarial-verifier',
       capital: 100,
     }),
     createAgent({
       id: 'RecklessAuditor',
       role: 'AUDITOR',
-      model: apiKey ? 'gpt-4o-mini' : 'speculative-challenger',
+      model: isLive ? liveModel : 'speculative-challenger',
       capital: 100,
     }),
   ];
@@ -261,6 +264,20 @@ ${c.cyan}╔══════════════════════�
         console.log(`\n  ${c.bgRed}${c.white}${c.bold} 💀 BANKRUPTCY EVENT: ${agent.id.toUpperCase()} HAS REACHED 0 CAPITAL! ${c.reset}`);
         console.log(
           `     ${c.red}Game-Theoretic Rule:${c.reset} ${agent.id} possesses zero collateral. Permanently excluded from all future rounds in this tournament.`
+        );
+      },
+
+      onError: (error, context) => {
+        const phaseLabel =
+          context.phase === 'proposal'
+            ? 'Proposal Generation'
+            : `Challenge Generation (vs ${context.targetGenerator?.id ?? 'Target'})`;
+        console.log(
+          `\n  ${c.bgRed}${c.white}${c.bold} ⚠️  ADAPTER ERROR [${context.agent.id}]: ${phaseLabel} ${c.reset}`
+        );
+        console.log(`     ${c.red}${error.message || String(error)}${c.reset}`);
+        console.log(
+          `     ${c.dim}Model: ${context.agent.model} | Round: ${context.roundNumber}${c.reset}\n`
         );
       },
     },

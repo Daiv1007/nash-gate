@@ -10,6 +10,7 @@ import {
   MockAdapter,
   OpenAICompatibleAdapter,
   extractJsonFromText,
+  resolveDefaultModel,
   type ProblemContext,
 } from '../src/adapters/index.ts';
 import { createAgent } from '../src/core/index.ts';
@@ -443,4 +444,77 @@ test('OpenAICompatibleAdapter: Handles 400 response_format rejection with seamle
   assert.equal(callCount, 2);
   assert.equal(proposal.solution, 'function retry() { return 1; }');
   assert.equal(proposal.stake, 10);
+});
+
+// ---------------------------------------------------------------------------
+// 4. Dynamic Model Resolution Tests
+// ---------------------------------------------------------------------------
+
+test('resolveDefaultModel: returns exact model name when LLM_MODEL is set', () => {
+  const originalEnv = { ...process.env };
+  try {
+    process.env.LLM_MODEL = 'qwen2.5-coder:7b';
+    process.env.LLM_API_KEY = 'AIzaSy123456';
+    process.env.LLM_BASE_URL = 'http://localhost:11434/v1';
+
+    // LLM_MODEL takes precedence over everything
+    assert.equal(resolveDefaultModel(), 'qwen2.5-coder:7b');
+  } finally {
+    process.env = originalEnv;
+  }
+});
+
+test('resolveDefaultModel: defaults to gemini-2.5-flash when LLM_API_KEY starts with AIza', () => {
+  const originalEnv = { ...process.env };
+  try {
+    delete process.env.LLM_MODEL;
+    process.env.LLM_API_KEY = 'AIzaSyFakeGeminiKey123';
+    process.env.LLM_BASE_URL = 'http://localhost:11434/v1';
+
+    // AIza key takes precedence over 11434 base URL
+    assert.equal(resolveDefaultModel(), 'gemini-2.5-flash');
+  } finally {
+    process.env = originalEnv;
+  }
+});
+
+test('resolveDefaultModel: defaults to llama3.2 when LLM_BASE_URL contains 11434 (Ollama)', () => {
+  const originalEnv = { ...process.env };
+  try {
+    delete process.env.LLM_MODEL;
+    delete process.env.LLM_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    process.env.LLM_BASE_URL = 'http://localhost:11434/v1';
+
+    assert.equal(resolveDefaultModel(), 'llama3.2');
+  } finally {
+    process.env = originalEnv;
+  }
+});
+
+test('resolveDefaultModel: defaults to gpt-4o-mini as universal fallback', () => {
+  const originalEnv = { ...process.env };
+  try {
+    delete process.env.LLM_MODEL;
+    delete process.env.LLM_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.LLM_BASE_URL;
+
+    assert.equal(resolveDefaultModel(), 'gpt-4o-mini');
+  } finally {
+    process.env = originalEnv;
+  }
+});
+
+test('resolveDefaultModel: falls back to gpt-4o-mini when non-AIza key and non-11434 url are used', () => {
+  const originalEnv = { ...process.env };
+  try {
+    delete process.env.LLM_MODEL;
+    process.env.LLM_API_KEY = 'sk-proj-openai12345';
+    process.env.LLM_BASE_URL = 'https://api.openai.com/v1';
+
+    assert.equal(resolveDefaultModel(), 'gpt-4o-mini');
+  } finally {
+    process.env = originalEnv;
+  }
 });

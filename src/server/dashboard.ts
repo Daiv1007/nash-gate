@@ -13,6 +13,8 @@ import { createAgent, type Agent } from '../core/index.ts';
 import {
   MockAdapter,
   OpenAICompatibleAdapter,
+  resolveDefaultModel,
+  isLiveMode,
   type AgentAdapter,
   type ProblemContext,
 } from '../adapters/index.ts';
@@ -68,31 +70,33 @@ export const tournamentProblems: ProblemContext[] = [
 
 /**
  * Creates fresh initial roster of 4 agents with 100 capital each.
+ * When isLive is true, dynamically resolves the model name across all agents.
  */
-export function createInitialAgents(hasApiKey: boolean = false): Agent[] {
+export function createInitialAgents(isLive: boolean = isLiveMode()): Agent[] {
+  const model = isLive ? resolveDefaultModel() : null;
   return [
     createAgent({
       id: 'AlphaGen',
       role: 'GENERATOR',
-      model: hasApiKey ? 'gpt-4o-mini' : 'deterministic-solid',
+      model: model ?? 'deterministic-solid',
       capital: 100,
     }),
     createAgent({
       id: 'BuggyGen',
       role: 'GENERATOR',
-      model: hasApiKey ? 'llama-3-8b' : 'heuristic-naive',
+      model: model ?? 'heuristic-naive',
       capital: 100,
     }),
     createAgent({
       id: 'SharpAuditor',
       role: 'AUDITOR',
-      model: hasApiKey ? 'claude-3-5-sonnet' : 'adversarial-verifier',
+      model: model ?? 'adversarial-verifier',
       capital: 100,
     }),
     createAgent({
       id: 'RecklessAuditor',
       role: 'AUDITOR',
-      model: hasApiKey ? 'gpt-4o-mini' : 'speculative-challenger',
+      model: model ?? 'speculative-challenger',
       capital: 100,
     }),
   ];
@@ -102,16 +106,20 @@ export function createInitialAgents(hasApiKey: boolean = false): Agent[] {
 // Server-Sent Events (SSE) Manager & Tournament Orchestration State
 // ---------------------------------------------------------------------------
 
+export interface DashboardServerOptions {
+  readonly paceMs?: number;
+}
+
 export class DashboardServer {
   private server: http.Server | null = null;
   private readonly sseClients = new Set<http.ServerResponse>();
   private isTournamentRunning = false;
-  private currentAgents: Agent[] = createInitialAgents(Boolean(process.env.LLM_API_KEY));
+  private currentAgents: Agent[] = createInitialAgents(isLiveMode());
   private lastTournamentResult: TournamentResult | null = null;
   private currentRoundNumber = 0;
   private readonly paceMs: number;
 
-  constructor(options?: { paceMs?: number }) {
+  constructor(options?: DashboardServerOptions) {
     this.paceMs = options?.paceMs ?? DEFAULT_PACE_DELAY_MS;
   }
 
@@ -137,13 +145,15 @@ export class DashboardServer {
    * Returns snapshot of current state for new connections.
    */
   public getStateSnapshot() {
+    const isLive = isLiveMode();
     return {
       isRunning: this.isTournamentRunning,
       agents: this.currentAgents,
       currentRound: this.currentRoundNumber,
       totalProblems: tournamentProblems.length,
       problems: tournamentProblems,
-      adapterMode: process.env.LLM_API_KEY ? 'live-llm' : 'offline-mock',
+      adapterMode: isLive ? 'live-llm' : 'offline-mock',
+      resolvedModel: isLive ? resolveDefaultModel() : undefined,
       lastResult: this.lastTournamentResult,
       connectedClients: this.sseClients.size,
     };
@@ -161,17 +171,19 @@ export class DashboardServer {
     this.currentRoundNumber = 0;
 
     // Reset initial agents for a clean tournament run
-    const apiKey = process.env.LLM_API_KEY;
-    this.currentAgents = createInitialAgents(Boolean(apiKey));
-    const adapter: AgentAdapter = apiKey
-      ? new OpenAICompatibleAdapter({ apiKey })
+    const isLive = isLiveMode();
+    const liveModel = resolveDefaultModel();
+    this.currentAgents = createInitialAgents(isLive);
+    const adapter: AgentAdapter = isLive
+      ? new OpenAICompatibleAdapter({ model: liveModel })
       : new MockAdapter();
 
     // Broadcast tournament kickoff
     this.broadcast('tournament:start', {
       initialAgents: this.currentAgents,
       totalRounds: tournamentProblems.length,
-      adapterMode: apiKey ? 'live-llm' : 'offline-mock',
+      adapterMode: isLive ? 'live-llm' : 'offline-mock',
+      resolvedModel: isLive ? liveModel : undefined,
     });
 
     // Execute asynchronously with pacing delay so human viewers can follow live
@@ -256,6 +268,17 @@ export class DashboardServer {
               this.lastTournamentResult = tournamentResult;
               this.currentAgents = [...tournamentResult.finalAgents];
               this.broadcast('tournament:end', { tournamentResult });
+              await this.sleep(this.paceMs);
+            },
+
+            onError: async (error, context) => {
+              this.broadcast('engine:error', {
+                error: error.message || String(error),
+                phase: context.phase,
+                agent: context.agent,
+                targetGenerator: context.targetGenerator,
+                roundNumber: context.roundNumber,
+              });
               await this.sleep(this.paceMs);
             },
           },
@@ -409,6 +432,11 @@ async function runDirect() {
   const port = DEFAULT_PORT;
   const host = DEFAULT_HOST;
 
+  const isLive = isLiveMode();
+  const engineDesc = isLive
+    ? `\x1b[32mLive OpenAI-Compatible API (${resolveDefaultModel()})\x1b[0m`
+    : '\x1b[33mDeterministic Mock Catalog\x1b[0m';
+
   try {
     const actualPort = await server.listen(port, host);
     const url = `http://${host}:${actualPort}`;
@@ -421,7 +449,7 @@ async function runDirect() {
 
   \x1b[32m⚡ Visualizer Dashboard:\x1b[0m \x1b[1m\x1b[4m${url}\x1b[0m
   \x1b[35m📡 SSE Event Stream:\x1b[0m     ${url}/events
-  \x1b[34m🤖 Engine Mode:\x1b[0m          ${process.env.LLM_API_KEY ? '\x1b[32mLive OpenAI-Compatible API\x1b[0m' : '\x1b[33mDeterministic Mock Catalog\x1b[0m'}
+  \x1b[34m🤖 Engine Mode:\x1b[0m          ${engineDesc}
   \x1b[90m⏱️  Pacing Step Delay:\x1b[0m    ${DEFAULT_PACE_DELAY_MS}ms per step
 
   \x1b[90mPress Ctrl+C to stop the dashboard server.\x1b[0m

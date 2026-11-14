@@ -7,6 +7,7 @@ export type {
   RoundResult,
   TournamentResult,
   GameLoopHooks,
+  GameLoopErrorContext,
   RunRoundParams,
   RunTournamentParams,
 } from './game-loop.ts';

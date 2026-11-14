@@ -4,7 +4,7 @@
 
 ![NashGate Real-Time Consensus Dashboard](assets/nash-gate-demo.gif)
 
-[![Tests](https://img.shields.io/badge/tests-95%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-104%20passing-brightgreen.svg)](tests/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Dependencies](https://img.shields.io/badge/dependencies-zero-success.svg)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-black.svg)](package.json)
@@ -106,7 +106,7 @@ git clone https://github.com/Daiv1007/nash-gate.git
 cd nash-gate
 npm test
 ```
-All 95 unit, oracle, adapter, settlement, and server tests will run with sub-second execution.
+All 104 unit, oracle, adapter, settlement, and server tests will run with sub-second execution.
 
 ### 2. Interactive CLI Demo
 
@@ -166,31 +166,51 @@ Open `http://localhost:3000` in any browser to watch:
 
 NashGate supports live multi-model execution via `OpenAICompatibleAdapter` with zero third-party SDK dependencies (powered by Node native `fetch`).
 
-Set `LLM_API_KEY` (and optionally `LLM_BASE_URL`) in your environment:
+The engine features **Dynamic Model Resolution**, automatically discovering your target provider and default model:
+1. `LLM_MODEL`: Exact model name override (e.g. `llama3.2`, `gemini-2.5-flash`, `gpt-4o-mini`, `qwen2.5-coder:7b`).
+2. `LLM_API_KEY` starting with `AIza`: Defaults to `gemini-2.5-flash` and routes to Google's OpenAI-compatible endpoint.
+3. `LLM_BASE_URL` containing `11434` (Ollama): Defaults to `llama3.2` and routes to local Ollama.
+4. Fallback: Defaults to `gpt-4o-mini` (OpenAI).
 
 ### Gemini
 ```bash
 export LLM_API_KEY="AIzaSyYourGeminiApiKey"
-# Base URL automatically resolves to:
-# https://generativelanguage.googleapis.com/v1beta/openai/
+# Automatically resolves to 'gemini-2.5-flash' and connects to Google's OpenAI endpoint:
+# https://generativelanguage.googleapis.com/v1beta/openai
 npm run demo
+# or npm run ui
 ```
 
 ### Local Ollama
 ```bash
 export LLM_BASE_URL="http://localhost:11434/v1"
-export LLM_API_KEY="ollama" # placeholder
+# Automatically resolves model to 'llama3.2' (no API key required)
 npm run demo
+# or npm run ui
 ```
 
 ### OpenAI
 ```bash
 export LLM_API_KEY="sk-proj-YourOpenAiKey"
+# Automatically defaults to 'gpt-4o-mini'
+npm run demo
+# or npm run ui
+```
+
+### Custom Model Override
+```bash
+export LLM_MODEL="deepseek-coder:6.7b"
+export LLM_BASE_URL="http://localhost:11434/v1"
 npm run demo
 ```
 
+### Error Telemetry & Fault Visibility
+If an API key is invalid, an endpoint is unreachable, or a model is not found:
+- **CLI Demo (`npm run demo`)**: Displays prominent red warnings detailing the agent, model, round, and provider error.
+- **Web UI (`npm run ui`)**: Real-time SSE stream broadcasts `engine:error` events and displays visible error cards in the live activity feed rather than silently skipping rounds.
+
 ### Offline Deterministic Mode (Default)
-When `LLM_API_KEY` is omitted, NashGate operates in **100% deterministic offline mode** using its built-in algorithmic catalog, enabling end-to-end game-theoretic verification with zero network latency or API expense.
+When live credentials are omitted, NashGate operates in **100% deterministic offline mode** using its built-in algorithmic catalog, enabling end-to-end game-theoretic verification with zero network latency or API expense.
 
 ---
 
@@ -218,7 +238,7 @@ nash-gate/
 │   │   └── public/
 │   │       └── index.html     # Dark-mode reactive single-page dashboard
 │   └── demo.ts                # Terminal CLI demonstration
-├── tests/                     # 95 unit and integration tests
+├── tests/                     # 104 unit and integration tests
 ├── SPEC.md                    # Technical specification v0.1
 ├── AGENTS.md                  # Development principles & engineering rules
 └── package.json
