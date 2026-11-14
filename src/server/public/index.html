@@ -1757,6 +1757,7 @@
           agentUrlOverrides[id] = baseUrl;
         }
         agentModelOverrides[id] = model;
+        localStorage.setItem('nashgate_agent_model_' + id, model);
 
         updateAgents(data.agents);
         closeAddAgentModal();
@@ -1822,6 +1823,7 @@
         delete agentUrlOverrides[agentId];
         sessionStorage.removeItem('nashgate_key_' + agentId);
         sessionStorage.removeItem('nashgate_url_' + agentId);
+        localStorage.removeItem('nashgate_agent_model_' + agentId);
         updateAgents(data.agents);
       } catch (err) {
         alert(`Failed to delete agent: ${err.message}`);
@@ -1837,7 +1839,12 @@
         const res = await fetch('/api/agents/reset', { method: 'POST' });
         const data = await res.json();
         if (data.ok && data.agents) {
+          for (const a of agentsState) {
+            delete agentModelOverrides[a.id];
+            localStorage.removeItem('nashgate_agent_model_' + a.id);
+          }
           updateAgents(data.agents);
+        }
         }
       } catch (err) {
         alert(`Failed to reset agents: ${err.message}`);
@@ -1958,25 +1965,17 @@
       return clean;
     }
 
-    function applyGlobalModel(rawModel) {
+    function getGlobalModel() {
+      return sanitizeModelName(localStorage.getItem('nashgate_selected_model') || 'gemini-3.5-flash-lite');
+    }
+
+    function syncHeaderModelUI(rawModel) {
       const clean = sanitizeModelName(rawModel);
       localStorage.setItem('nashgate_selected_model', clean);
       if (engineModeBadge) {
         engineModeBadge.textContent = `⚡ Live LLM (${clean})`;
       }
 
-      // Automatically update all agent card selectors on screen
-      agentsState.forEach((a) => {
-        agentModelOverrides[a.id] = clean;
-        const sel = document.getElementById(`agent-model-${a.id}`);
-        if (sel) {
-          sel.value = clean;
-        }
-      });
-    }
-
-    function setModelSelectorValue(modelName) {
-      const clean = sanitizeModelName(modelName);
       const modelSel = document.getElementById('modelSelect');
       const customInput = document.getElementById('customModelInput');
       if (!modelSel) return;
@@ -1998,7 +1997,10 @@
       } else {
         if (customInput) customInput.style.display = 'none';
       }
-      applyGlobalModel(clean);
+    }
+
+    function setModelSelectorValue(modelName) {
+      syncHeaderModelUI(modelName);
     }
 
     function onModelSelectChange(val) {
@@ -2006,21 +2008,21 @@
       let chosen = val;
       if (val === '__custom__') {
         if (customInput) customInput.style.display = 'inline-block';
-        chosen = customInput?.value?.trim() || 'gemini-2.5-flash';
+        chosen = customInput?.value?.trim() || 'gemini-3.5-flash-lite';
       } else {
         if (customInput) customInput.style.display = 'none';
       }
-      applyGlobalModel(chosen);
+      syncHeaderModelUI(chosen);
     }
 
     function onCustomModelInputChange(val) {
       if (val && val.trim()) {
-        applyGlobalModel(val.trim());
+        syncHeaderModelUI(val.trim());
       }
     }
 
     function switchModelAndRun(newModel) {
-      setModelSelectorValue(newModel);
+      syncHeaderModelUI(newModel);
       triggerTournament();
     }
 
@@ -2032,14 +2034,33 @@
     }
 
     function onModelInputChange(val) {
-      applyGlobalModel(val);
+      syncHeaderModelUI(val);
     }
 
-    function onAgentModelChange(agentId, newModel) {
-      if (newModel && newModel.trim()) {
-        agentModelOverrides[agentId] = sanitizeModelName(newModel);
-      } else {
-        delete agentModelOverrides[agentId];
+    async function onAgentModelChange(agentId, newModel) {
+      const clean = sanitizeModelName(newModel);
+      agentModelOverrides[agentId] = clean;
+      localStorage.setItem('nashgate_agent_model_' + agentId, clean);
+
+      const agent = agentsState.find((a) => a.id === agentId);
+      if (agent) {
+        agent.model = clean;
+        const existingKey = agentKeyOverrides[agentId] || sessionStorage.getItem('nashgate_key_' + agentId) || undefined;
+        const existingUrl = agentUrlOverrides[agentId] || sessionStorage.getItem('nashgate_url_' + agentId) || agent.baseUrl || undefined;
+        try {
+          await fetch('/api/agents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: agent.id,
+              role: agent.role,
+              model: clean,
+              capital: agent.capital,
+              apiKey: existingKey,
+              baseUrl: existingUrl,
+            }),
+          });
+        } catch {}
       }
     }
 
@@ -2086,8 +2107,8 @@
       es.addEventListener('state:init', (e) => {
         const data = JSON.parse(e.data);
         let savedModel = localStorage.getItem('nashgate_selected_model');
-        const activeModelName = sanitizeModelName(savedModel || data.resolvedModel || 'gemini-2.5-flash');
-        setModelSelectorValue(activeModelName);
+        const activeModelName = sanitizeModelName(savedModel || data.resolvedModel || 'gemini-3.5-flash-lite');
+        syncHeaderModelUI(activeModelName);
         engineModeBadge.textContent = data.adapterMode === 'live-llm' 
           ? `⚡ Live LLM (${activeModelName})` 
           : '🤖 Offline Mock Catalog';
@@ -2105,7 +2126,7 @@
         if (data.resolvedModel) {
           const cleanModel = sanitizeModelName(data.resolvedModel);
           engineModeBadge.textContent = `⚡ Live LLM (${cleanModel})`;
-          setModelSelectorValue(cleanModel);
+          syncHeaderModelUI(cleanModel);
         }
         oraclePassedCount = 0;
         oracleFailedCount = 0;
@@ -2626,7 +2647,9 @@
         card.className = `agent-card ${isBankrupt ? 'bankrupt' : ''}`;
         card.id = `card-${agent.id}`;
 
-        const currentAgentModel = sanitizeModelName(agentModelOverrides[agent.id] || agent.model || 'gemini-3.5-flash-lite');
+        const savedAgentModel = agentModelOverrides[agent.id] || localStorage.getItem('nashgate_agent_model_' + agent.id);
+        const currentAgentModel = sanitizeModelName(agent.model || savedAgentModel || getGlobalModel());
+        agentModelOverrides[agent.id] = currentAgentModel;
         const hasKey = Boolean(agentKeyOverrides[agent.id] || sessionStorage.getItem('nashgate_key_' + agent.id) || agent.hasDedicatedKey);
 
         card.innerHTML = `
@@ -2791,31 +2814,28 @@
       const modelVal = rawModel ? sanitizeModelName(rawModel) : 'gemini-3.5-flash-lite';
       localStorage.setItem('nashgate_selected_model', modelVal);
 
-      const sanitizedAgentOverrides = {};
-      for (const [id, m] of Object.entries(agentModelOverrides)) {
-        if (m && m.trim()) {
-          sanitizedAgentOverrides[id] = sanitizeModelName(m);
-        }
-      }
-
-      // Include session API key if the user pasted one into the UI
-      const sessionKey = getSessionApiKey();
-      const roundsVal = Number(document.getElementById('roundsSelect')?.value) || 3;
-
       // Build complete per-agent specifications with individual models, roles, and API keys
       const agentsPayload = agentsState.map((a) => {
-        const m = agentModelOverrides[a.id] || a.model || modelVal;
+        const savedModel = agentModelOverrides[a.id] || localStorage.getItem('nashgate_agent_model_' + a.id);
+        const m = sanitizeModelName(a.model || savedModel || modelVal);
         const k = agentKeyOverrides[a.id] || sessionStorage.getItem('nashgate_key_' + a.id) || undefined;
         const u = agentUrlOverrides[a.id] || sessionStorage.getItem('nashgate_url_' + a.id) || a.baseUrl || undefined;
         return {
           id: a.id,
           role: a.role,
-          model: sanitizeModelName(m),
+          model: m,
           capital: a.capital,
           apiKey: k,
           baseUrl: u,
         };
       });
+
+      const sanitizedAgentOverrides = {};
+      for (const a of agentsPayload) {
+        if (a.model) {
+          sanitizedAgentOverrides[a.id] = a.model;
+        }
+      }
 
       const payload = {
         model: modelVal || undefined,
