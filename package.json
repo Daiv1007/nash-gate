@@ -4,7 +4,8 @@
   "description": "Game-theoretic consensus gate for multi-agent AI systems",
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "demo": "node --no-warnings src/demo.ts"
   },
   "keywords": [
     "game-theory",
