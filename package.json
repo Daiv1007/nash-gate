@@ -1,0 +1,17 @@
+{
+  "name": "nash-gate",
+  "version": "0.1.0",
+  "description": "Game-theoretic consensus gate for multi-agent AI systems",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "game-theory",
+    "consensus",
+    "multi-agent",
+    "arbitration"
+  ],
+  "author": "",
+  "license": "Apache-2.0"
+}
