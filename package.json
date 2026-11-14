@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "demo": "node --no-warnings src/demo.ts"
+    "demo": "node --no-warnings src/demo.ts",
+    "ui": "node --no-warnings src/server/dashboard.ts"
   },
   "keywords": [
     "game-theory",

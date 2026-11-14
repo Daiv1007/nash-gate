@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NashGate — Game-Theoretic Multi-Agent Consensus Visualizer</title>
+  <style>
+    :root {
+      --bg-base: #080b11;
+      --bg-surface: #0f1623;
+      --bg-card: #151e2e;
+      --bg-card-hover: #1b263b;
+      --border: #222f44;
+      --border-accent: #2e3e5c;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      
+      --cyan: #06b6d4;
+      --cyan-glow: rgba(6, 182, 212, 0.25);
+      --purple: #a855f7;
+      --purple-glow: rgba(168, 85, 247, 0.25);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.25);
+      --rose: #f43f5e;
+      --rose-glow: rgba(244, 63, 94, 0.25);
+      --amber: #f59e0b;
+      --amber-glow: rgba(245, 158, 11, 0.25);
+      --blue: #3b82f6;
+
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: "Fira Code", "SF Mono", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation Bar */
+    header {
+      background: rgba(15, 22, 35, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0.85rem 1.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .brand-logo {
+      width: 34px;
+      height: 34px;
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 1.1rem;
+      color: #fff;
+      box-shadow: 0 0 16px var(--cyan-glow);
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #fff;
+    }
+
+    .brand-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .stream-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.78rem;
+      font-family: var(--font-mono);
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--emerald);
+    }
+
+    .stream-status.offline {
+      background: rgba(244, 63, 94, 0.1);
+      border-color: rgba(244, 63, 94, 0.3);
+      color: var(--rose);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+      animation: pulse 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .engine-badge {
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .btn-start {
+      background: linear-gradient(135deg, #0ea5e9, #6366f1);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.55rem 1.25rem;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 12px rgba(14, 165, 233, 0.3);
+    }
+
+    .btn-start:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 18px rgba(14, 165, 233, 0.45);
+    }
+
+    .btn-start:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Layout Container */
+    main {
+      flex: 1;
+      max-width: 1540px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* Metrics Summary Bar */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1rem;
+    }
+
+    .metric-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--border-accent);
+    }
+
+    .metric-card.accent-cyan::before { background: var(--cyan); }
+    .metric-card.accent-purple::before { background: var(--purple); }
+    .metric-card.accent-emerald::before { background: var(--emerald); }
+    .metric-card.accent-amber::before { background: var(--amber); }
+
+    .metric-title {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-dim);
+    }
+
+    .metric-value {
+      font-size: 1.45rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: #fff;
+    }
+
+    .metric-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Split Dashboard Body */
+    .dashboard-split {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-split {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Section Panels */
+    .panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(21, 30, 46, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-title {
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.75px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Agent Cards Container */
+    .agents-list {
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .agent-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .agent-card:hover {
+      border-color: var(--border-accent);
+      background: var(--bg-card-hover);
+    }
+
+    .agent-card.bankrupt {
+      border-color: rgba(244, 63, 94, 0.4);
+      background: rgba(244, 63, 94, 0.05);
+      opacity: 0.8;
+    }
+
+    .agent-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    .agent-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .agent-id {
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .agent-model {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+    }
+
+    .agent-badges {
+      display: flex;
+      gap: 0.35rem;
+      align-items: center;
+    }
+
+    .badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-generator {
+      background: rgba(6, 182, 212, 0.15);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      color: var(--cyan);
+    }
+
+    .badge-auditor {
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      color: var(--purple);
+    }
+
+    .badge-active {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--emerald);
+    }
+
+    .badge-bankrupt {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      color: var(--rose);
+      animation: pulse 1.5s infinite ease;
+    }
+
+    .capital-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .capital-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    .capital-label {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .capital-value-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .capital-value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: #fff;
+    }
+
+    .delta-indicator {
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: all 0.4s ease;
+    }
+
+    .delta-indicator.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .delta-indicator.positive { color: var(--emerald); }
+    .delta-indicator.negative { color: var(--rose); }
+
+    /* Animated Capital Bar */
+    .bar-track {
+      width: 100%;
+      height: 7px;
+      background: rgba(34, 47, 68, 0.5);
+      border-radius: 9999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 50%;
+      border-radius: 9999px;
+      transition: width 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.4s ease;
+      background: linear-gradient(90deg, var(--cyan), #38bdf8);
+    }
+
+    .bar-fill.auditor {
+      background: linear-gradient(90deg, var(--purple), #c084fc);
+    }
+
+    .bar-fill.profit {
+      background: linear-gradient(90deg, var(--emerald), #34d399);
+    }
+
+    .bar-fill.bankrupt {
+      background: var(--rose);
+      width: 0% !important;
+    }
+
+    .agent-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      padding-top: 0.35rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .roi-badge {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+    }
+
+    .roi-positive {
+      color: var(--emerald);
+      background: rgba(16, 185, 129, 0.1);
+    }
+
+    .roi-negative {
+      color: var(--rose);
+      background: rgba(244, 63, 94, 0.1);
+    }
+
+    .roi-neutral {
+      color: var(--text-dim);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    /* Live Feed Panel */
+    .feed-container {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 270px);
+      min-height: 520px;
+    }
+
+    /* Current Round Problem Banner */
+    .problem-banner {
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(168, 85, 247, 0.08));
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .problem-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .problem-round {
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.75px;
+    }
+
+    .problem-entrypoint {
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      background: rgba(0, 0, 0, 0.3);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .problem-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .problem-task {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Feed Controls */
+    .feed-toolbar {
+      padding: 0.5rem 1.25rem;
+      background: rgba(15, 22, 35, 0.6);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.76rem;
+    }
+
+    .feed-count {
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    .feed-tools {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .toolbar-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .toolbar-btn:hover {
+      color: #fff;
+    }
+
+    .autoscroll-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      color: var(--text-dim);
+    }
+
+    .autoscroll-toggle input {
+      accent-color: var(--cyan);
+      cursor: pointer;
+    }
+
+    /* Scrollable Events Area */
+    .events-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      scroll-behavior: smooth;
+    }
+
+    .events-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .events-scroll::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    .events-scroll::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    /* Feed Event Cards */
+    .event-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      animation: fadeInSlide 0.35s ease forwards;
+    }
+
+    @keyframes fadeInSlide {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .event-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .event-badge-tag {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .event-badge-proposal {
+      background: rgba(6, 182, 212, 0.15);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      color: var(--cyan);
+    }
+
+    .event-badge-challenge {
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      color: var(--purple);
+    }
+
+    .event-badge-pass {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: var(--emerald);
+      box-shadow: 0 0 12px var(--emerald-glow);
+    }
+
+    .event-badge-fail {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      color: var(--rose);
+      box-shadow: 0 0 12px var(--rose-glow);
+    }
+
+    .event-badge-settlement {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: var(--blue);
+    }
+
+    .event-badge-bankruptcy {
+      background: rgba(244, 63, 94, 0.25);
+      border: 1px solid var(--rose);
+      color: #fff;
+    }
+
+    .event-time {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+    }
+
+    .event-content {
+      font-size: 0.85rem;
+      line-height: 1.45;
+      color: var(--text-main);
+    }
+
+    /* Code Snippet Box */
+    .code-box {
+      background: #090d15;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      overflow-x: auto;
+      max-height: 220px;
+      line-height: 1.4;
+      position: relative;
+    }
+
+    /* Test Case Display */
+    .io-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 640px) {
+      .io-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .io-card {
+      background: #090d15;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.6rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .io-label {
+      font-size: 0.68rem;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .io-value {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      word-break: break-all;
+    }
+
+    /* Capital Transfer Logs */
+    .transfers-box {
+      background: #0a0f1a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .transfer-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      font-family: var(--font-mono);
+      padding: 0.35rem 0.5rem;
+      border-radius: 4px;
+    }
+
+    .transfer-line.bounty {
+      background: rgba(16, 185, 129, 0.08);
+      border-left: 3px solid var(--emerald);
+    }
+
+    .transfer-line.penalty {
+      background: rgba(244, 63, 94, 0.08);
+      border-left: 3px solid var(--rose);
+    }
+
+    .transfer-line.dividend {
+      background: rgba(59, 130, 246, 0.08);
+      border-left: 3px solid var(--blue);
+    }
+
+    /* Leaderboard Podium */
+    .leaderboard-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      font-family: var(--font-mono);
+      margin-top: 0.5rem;
+    }
+
+    .leaderboard-table th {
+      text-align: left;
+      padding: 0.5rem;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+      text-transform: uppercase;
+      font-size: 0.7rem;
+    }
+
+    .leaderboard-table td {
+      padding: 0.6rem 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4rem 2rem;
+      color: var(--text-dim);
+      text-align: center;
+      gap: 0.75rem;
+    }
+
+    .empty-icon {
+      font-size: 2.2rem;
+      opacity: 0.6;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">N</div>
+      <div>
+        <div class="brand-title">NASHGATE</div>
+        <div class="brand-subtitle">Game-Theoretic Multi-Agent Consensus Visualizer</div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <div id="streamStatus" class="stream-status">
+        <span class="status-dot"></span>
+        <span id="streamStatusText">SSE Stream Live</span>
+      </div>
+
+      <div id="engineModeBadge" class="engine-badge">
+        Adapter: Loading...
+      </div>
+
+      <button id="startBtn" class="btn-start" onclick="triggerTournament()">
+        <span>▶</span>
+        <span id="startBtnText">Start Tournament</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Workspace -->
+  <main>
+    <!-- Top Metrics Overview Bar -->
+    <section class="metrics-grid">
+      <div class="metric-card accent-cyan">
+        <span class="metric-title">Consensus State</span>
+        <span id="metricState" class="metric-value">STANDBY</span>
+        <span id="metricStateSub" class="metric-sub">Ready to launch</span>
+      </div>
+
+      <div class="metric-card accent-emerald">
+        <span class="metric-title">Solvent Pool</span>
+        <span id="metricSolvent" class="metric-value">4 / 4</span>
+        <span class="metric-sub">Active staked agents</span>
+      </div>
+
+      <div class="metric-card accent-purple">
+        <span class="metric-title">Economy Capital</span>
+        <span id="metricEconomy" class="metric-value">400.00</span>
+        <span class="metric-sub">Total capital collateral</span>
+      </div>
+
+      <div class="metric-card accent-amber">
+        <span class="metric-title">Oracle Verifications</span>
+        <span id="metricOracle" class="metric-value">0</span>
+        <span id="metricOracleSub" class="metric-sub">0 passed / 0 failed</span>
+      </div>
+    </section>
+
+    <!-- Split View: Agents Ledger (Left) & Live Round/Oracle Feed (Right) -->
+    <section class="dashboard-split">
+      
+      <!-- Left Panel: Live Agent Cards -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">
+            <span>🛡️</span> Participating Agents
+          </span>
+          <span id="agentCountBadge" class="badge badge-generator">4 Agents</span>
+        </div>
+
+        <div id="agentsContainer" class="agents-list">
+          <!-- Dynamically populated Agent Cards -->
+        </div>
+      </div>
+
+      <!-- Right Panel: Live Round & Oracle Feed -->
+      <div class="panel feed-container">
+        
+        <!-- Problem Context Banner (Updated on each round) -->
+        <div id="problemBanner" class="problem-banner" style="display: none;">
+          <div class="problem-top">
+            <span id="bannerRoundTag" class="problem-round">ROUND 1 OF 3</span>
+            <span id="bannerEntrypoint" class="problem-entrypoint">entrypoint: isPalindrome</span>
+          </div>
+          <div id="bannerTitle" class="problem-title">Palindrome Normalization</div>
+          <div id="bannerTask" class="problem-task">Implement isPalindrome(s: string): boolean that strips non-alphanumeric characters and ignores case.</div>
+        </div>
+
+        <!-- Feed Control Toolbar -->
+        <div class="feed-toolbar">
+          <span id="feedCount" class="feed-count">0 events streamed</span>
+          <div class="feed-tools">
+            <label class="autoscroll-toggle">
+              <input type="checkbox" id="autoscrollToggle" checked>
+              <span>Auto-scroll</span>
+            </label>
+            <button class="toolbar-btn" onclick="clearFeed()">
+              <span>✕</span> Clear Feed
+            </button>
+          </div>
+        </div>
+
+        <!-- Events Stream Container -->
+        <div id="eventsContainer" class="events-scroll">
+          <div id="emptyFeedState" class="empty-state">
+            <div class="empty-icon">⚡</div>
+            <div style="font-weight: 600; color: #fff;">Consensus Engine Ready</div>
+            <div>Click <strong>Start Tournament</strong> to observe multi-agent proposals, adversarial audits, sandbox executions, and Nash settlements live.</div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Client-Side Real-Time Reactive Controller -->
+  <script>
+    // State Registry
+    let agentsState = [];
+    let isRunning = false;
+    let eventCounter = 0;
+    let oraclePassedCount = 0;
+    let oracleFailedCount = 0;
+    let currentRound = 0;
+
+    const startBtn = document.getElementById('startBtn');
+    const startBtnText = document.getElementById('startBtnText');
+    const streamStatus = document.getElementById('streamStatus');
+    const streamStatusText = document.getElementById('streamStatusText');
+    const engineModeBadge = document.getElementById('engineModeBadge');
+    const agentsContainer = document.getElementById('agentsContainer');
+    const eventsContainer = document.getElementById('eventsContainer');
+    const emptyFeedState = document.getElementById('emptyFeedState');
+    const problemBanner = document.getElementById('problemBanner');
+    const bannerRoundTag = document.getElementById('bannerRoundTag');
+    const bannerEntrypoint = document.getElementById('bannerEntrypoint');
+    const bannerTitle = document.getElementById('bannerTitle');
+    const bannerTask = document.getElementById('bannerTask');
+    const autoscrollToggle = document.getElementById('autoscrollToggle');
+    const feedCount = document.getElementById('feedCount');
+
+    const metricState = document.getElementById('metricState');
+    const metricStateSub = document.getElementById('metricStateSub');
+    const metricSolvent = document.getElementById('metricSolvent');
+    const metricEconomy = document.getElementById('metricEconomy');
+    const metricOracle = document.getElementById('metricOracle');
+    const metricOracleSub = document.getElementById('metricOracleSub');
+
+    // -------------------------------------------------------------------------
+    // SSE Stream Setup
+    // -------------------------------------------------------------------------
+    function initEventSource() {
+      const es = new EventSource('/events');
+
+      es.onopen = () => {
+        streamStatus.classList.remove('offline');
+        streamStatusText.textContent = 'SSE Stream Live';
+      };
+
+      es.onerror = () => {
+        streamStatus.classList.add('offline');
+        streamStatusText.textContent = 'Disconnected — Reconnecting';
+      };
+
+      // 1. Initial State Snapshot
+      es.addEventListener('state:init', (e) => {
+        const data = JSON.parse(e.data);
+        engineModeBadge.textContent = data.adapterMode === 'live-llm' 
+          ? '⚡ Live OpenAI API' 
+          : '🤖 Offline Mock Catalog';
+        
+        if (data.agents && data.agents.length > 0) {
+          updateAgents(data.agents);
+        }
+        setRunningState(data.isRunning);
+      });
+
+      // 2. Tournament Kickoff
+      es.addEventListener('tournament:start', (e) => {
+        const data = JSON.parse(e.data);
+        setRunningState(true);
+        oraclePassedCount = 0;
+        oracleFailedCount = 0;
+        updateOracleMetrics();
+        clearFeed();
+        updateAgents(data.initialAgents);
+        
+        appendEventCard({
+          type: 'tournament',
+          badgeText: '🏆 Tournament Started',
+          badgeClass: 'event-badge-proposal',
+          title: `Multi-Round Tournament Launched (${data.totalRounds} Rounds)`,
+          body: `<p>Arbitration protocol initialized with 4 staked agents. Capital is at risk; non-compliant agents face asymmetric liquidation penalties.</p>`
+        });
+      });
+
+      // 3. Round Kickoff
+      es.addEventListener('round:start', (e) => {
+        const data = JSON.parse(e.data);
+        currentRound = data.roundNumber;
+        
+        metricState.textContent = `ROUND ${data.roundNumber}`;
+        metricStateSub.textContent = `Problem: ${data.problem.title}`;
+
+        problemBanner.style.display = 'flex';
+        bannerRoundTag.textContent = `ROUND ${data.roundNumber} OF 3`;
+        bannerEntrypoint.textContent = `entrypoint: ${data.problem.entrypoint || 'solve'}`;
+        bannerTitle.textContent = data.problem.title;
+        bannerTask.textContent = `${data.problem.task} ${data.problem.description || ''}`;
+
+        updateAgents(data.activeAgents);
+
+        appendEventCard({
+          type: 'round',
+          badgeText: `Round ${data.roundNumber}`,
+          badgeClass: 'event-badge-proposal',
+          title: `Round ${data.roundNumber}: ${data.problem.title}`,
+          body: `<p><strong>Task:</strong> ${escapeHtml(data.problem.task)}</p>
+                 <p style="color: var(--text-dim); margin-top: 4px;">Active Pool: ${data.activeAgents.map(a => `<span style="color:#fff;">${a.id}</span> (${a.capital})`).join(', ')}</p>`
+        });
+      });
+
+      // 4. Generator Proposal Submitted
+      es.addEventListener('proposal:submitted', (e) => {
+        const data = JSON.parse(e.data);
+        const { proposal, agent } = data;
+
+        appendEventCard({
+          type: 'proposal',
+          badgeText: `Proposal: ${agent.id}`,
+          badgeClass: 'event-badge-proposal',
+          title: `${agent.id} submitted solution (${agent.model})`,
+          body: `
+            <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+              <span class="badge badge-generator">Generator</span>
+              <span class="badge" style="background: rgba(255,255,255,0.06); color:#fff;">Stake: ${proposal.stake} Capital</span>
+            </div>
+            <p style="font-style: italic; color: var(--text-muted); margin-bottom: 8px;">"${escapeHtml(proposal.reasoning)}"</p>
+            <div class="code-box">${escapeHtml(proposal.solution)}</div>
+          `
+        });
+      });
+
+      // 5. Auditor Challenge Submitted
+      es.addEventListener('challenge:submitted', (e) => {
+        const data = JSON.parse(e.data);
+        const { challenge, auditor, targetGenerator } = data;
+
+        appendEventCard({
+          type: 'challenge',
+          badgeText: `⚔️ Challenge: ${auditor.id} vs ${targetGenerator.id}`,
+          badgeClass: 'event-badge-challenge',
+          title: `${auditor.id} lodged edge-case challenge against ${targetGenerator.id}`,
+          body: `
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+              <span class="badge badge-auditor">Auditor</span>
+              <span class="badge" style="background: rgba(255,255,255,0.06); color:#fff;">Stake: ${challenge.stake} Capital</span>
+            </div>
+            <div class="io-grid">
+              <div class="io-card">
+                <span class="io-label">Adversarial Input</span>
+                <span class="io-value">${escapeHtml(JSON.stringify(challenge.testInput))}</span>
+              </div>
+              <div class="io-card">
+                <span class="io-label">Claimed Expected Output</span>
+                <span class="io-value">${escapeHtml(JSON.stringify(challenge.expectedOutput))}</span>
+              </div>
+            </div>
+          `
+        });
+      });
+
+      // 6. Auditor Challenge Declined
+      es.addEventListener('challenge:declined', (e) => {
+        const data = JSON.parse(e.data);
+        const { auditor, targetGenerator } = data;
+
+        appendEventCard({
+          type: 'declined',
+          badgeText: `🛡️ Audit Declined`,
+          badgeClass: 'event-badge-settlement',
+          title: `${auditor.id} inspected ${targetGenerator.id} and declined to challenge`,
+          body: `<p style="color: var(--text-muted);">Prudent risk-avoidance: auditor refrained from challenging to protect against the <strong>-1.5x asymmetric anti-spam penalty</strong>.</p>`
+        });
+      });
+
+      // 7. Oracle Deterministic Verification
+      es.addEventListener('evaluation:completed', (e) => {
+        const data = JSON.parse(e.data);
+        const ev = data.evaluation;
+        const passed = ev.generatorPassed;
+
+        if (passed) {
+          oraclePassedCount++;
+        } else {
+          oracleFailedCount++;
+        }
+        updateOracleMetrics();
+
+        const badgeClass = passed ? 'event-badge-pass' : 'event-badge-fail';
+        const verdictTitle = passed ? '✔ ORACLE VERDICT: PASSED' : '✖ ORACLE VERDICT: FAILED';
+
+        appendEventCard({
+          type: 'oracle',
+          badgeText: verdictTitle,
+          badgeClass,
+          title: `Sandbox Oracle Verification (${ev.executionTimeMs}ms)`,
+          body: `
+            <div style="margin-bottom: 8px;">
+              ${passed 
+                ? `<span style="color: var(--emerald); font-weight: 600;">Generator survived!</span> Auditor's challenge was a false positive.`
+                : `<span style="color: var(--rose); font-weight: 600;">Adversarial breakdown!</span> Auditor broke the proposed solution.`}
+            </div>
+            <div class="io-grid">
+              <div class="io-card">
+                <span class="io-label">Sandbox Actual Output</span>
+                <span class="io-value">${escapeHtml(JSON.stringify(ev.actualOutput))}</span>
+              </div>
+              <div class="io-card">
+                <span class="io-label">Execution Duration</span>
+                <span class="io-value">${ev.executionTimeMs}ms (Deterministic Sandbox)</span>
+              </div>
+            </div>
+            ${ev.error ? `<div class="code-box" style="margin-top: 8px; color: var(--rose);">${escapeHtml(ev.error)}</div>` : ''}
+          `
+        });
+      });
+
+      // 8. Nash Payoff Settlement Completed
+      es.addEventListener('settlement:completed', (e) => {
+        const data = JSON.parse(e.data);
+        const { roundNumber, settlement, updatedAgents } = data;
+
+        if (updatedAgents) {
+          updateAgents(updatedAgents);
+        }
+
+        let transfersHtml = '';
+        
+        // Pairwise transfers
+        for (const pair of settlement.pairSettlements) {
+          if (!pair.generatorPassed) {
+            transfersHtml += `
+              <div class="transfer-line bounty">
+                <span>🏆 <strong>${pair.auditorId}</strong> awarded bounty</span>
+                <span style="color: var(--emerald); font-weight: 700;">+${pair.generatorStake.toFixed(2)} Capital</span>
+              </div>
+              <div class="transfer-line penalty">
+                <span>🔻 <strong>${pair.generatorId}</strong> forfeited stake</span>
+                <span style="color: var(--rose); font-weight: 700;">-${pair.generatorStake.toFixed(2)} Capital</span>
+              </div>
+            `;
+          } else {
+            transfersHtml += `
+              <div class="transfer-line penalty">
+                <span>⚠️ <strong>${pair.auditorId}</strong> false positive penalty (-1.5x)</span>
+                <span style="color: var(--rose); font-weight: 700;">${pair.auditorDelta.toFixed(2)} Capital</span>
+              </div>
+              <div class="transfer-line bounty">
+                <span>🛡️ <strong>${pair.generatorId}</strong> resilience dividend (+0.5x)</span>
+                <span style="color: var(--emerald); font-weight: 700;">+${pair.generatorDelta.toFixed(2)} Capital</span>
+              </div>
+            `;
+          }
+        }
+
+        // Unchallenged dividends
+        for (const unch of settlement.unchallengedSettlements) {
+          transfersHtml += `
+            <div class="transfer-line dividend">
+              <span>✨ <strong>${unch.agentId}</strong> unchallenged solution dividend (+10%)</span>
+              <span style="color: var(--blue); font-weight: 700;">+${unch.delta.toFixed(2)} Capital</span>
+            </div>
+          `;
+        }
+
+        appendEventCard({
+          type: 'settlement',
+          badgeText: `⚖️ Payoff Settlement: Round ${roundNumber}`,
+          badgeClass: 'event-badge-settlement',
+          title: `Nash Equilibrium Capital Transfers (Round ${roundNumber})`,
+          body: `
+            <div class="transfers-box">
+              ${transfersHtml || '<div style="color: var(--text-dim);">No capital transfers this round.</div>'}
+            </div>
+          `
+        });
+      });
+
+      // 9. Bankruptcy Alert
+      es.addEventListener('agent:bankruptcy', (e) => {
+        const data = JSON.parse(e.data);
+        const { agent, roundNumber } = data;
+
+        appendEventCard({
+          type: 'bankruptcy',
+          badgeText: `💀 BANKRUPTCY EVENT`,
+          badgeClass: 'event-badge-bankruptcy',
+          title: `${agent.id.toUpperCase()} LIQUIDATED (Round ${roundNumber})`,
+          body: `<p style="color: #fff; font-weight: 600;">Agent has reached 0.00 capital.</p>
+                 <p style="color: var(--rose); margin-top: 4px;">Game-Theoretic Enforcement: Insolvent agents possess zero reputation collateral and are permanently barred from participating in subsequent rounds.</p>`
+        });
+      });
+
+      // 10. Tournament End & Leaderboard
+      es.addEventListener('tournament:end', (e) => {
+        const data = JSON.parse(e.data);
+        const result = data.tournamentResult;
+
+        setRunningState(false);
+        metricState.textContent = 'COMPLETED';
+        metricStateSub.textContent = `${result.totalRoundsPlayed} rounds executed`;
+
+        updateAgents(result.finalAgents);
+
+        let rowsHtml = '';
+        const medals = ['🥇 1st', '🥈 2nd', '🥉 3rd', '💀 4th'];
+
+        result.leaderboard.forEach((ag, idx) => {
+          const medal = medals[idx] || `${idx + 1}th`;
+          const roi = ((ag.capital - 100) / 100) * 100;
+          const roiColor = roi > 0 ? 'var(--emerald)' : roi < 0 ? 'var(--rose)' : 'var(--text-dim)';
+          const statusBadge = ag.status === 'ACTIVE'
+            ? `<span class="badge badge-active">Solvent</span>`
+            : `<span class="badge badge-bankrupt">Bankrupt</span>`;
+
+          rowsHtml += `
+            <tr>
+              <td><strong>${medal}</strong></td>
+              <td style="color:#fff; font-weight:700;">${ag.id}</td>
+              <td><span class="badge ${ag.role === 'GENERATOR' ? 'badge-generator' : 'badge-auditor'}">${ag.role}</span></td>
+              <td style="font-weight:700; color:#fff;">${ag.capital.toFixed(2)}</td>
+              <td style="color: ${roiColor}; font-weight:700;">${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%</td>
+              <td>${statusBadge}</td>
+            </tr>
+          `;
+        });
+
+        appendEventCard({
+          type: 'tournament-end',
+          badgeText: '🏁 Tournament Summary',
+          badgeClass: 'event-badge-pass',
+          title: `Tournament Completed: ${result.terminationReason}`,
+          body: `
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Agent</th>
+                  <th>Role</th>
+                  <th>Final Capital</th>
+                  <th>Net ROI</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+            </table>
+            <div style="margin-top: 14px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px; font-size: 0.78rem; color: var(--text-muted);">
+              <strong>Key Game-Theoretic Takeaway:</strong> Skin-in-the-game prevents cheap-talk hallucinations. Auditors are incentivized to find real edge-cases, while asymmetric penalties deter spam challenges.
+            </div>
+          `
+        });
+      });
+
+      // 11. State changes
+      es.addEventListener('tournament:state', (e) => {
+        const data = JSON.parse(e.data);
+        setRunningState(data.isRunning);
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // Agent Cards Rendering
+    // -------------------------------------------------------------------------
+    function updateAgents(agents) {
+      agentsState = agents;
+      agentsContainer.innerHTML = '';
+
+      let solventCount = 0;
+      let totalEconomy = 0;
+
+      agents.forEach((agent) => {
+        if (agent.status === 'ACTIVE' && agent.capital > 0) {
+          solventCount++;
+        }
+        totalEconomy += agent.capital;
+
+        const isBankrupt = agent.status === 'BANKRUPT' || agent.capital <= 0;
+        const roi = ((agent.capital - 100) / 100) * 100;
+
+        let roiClass = 'roi-neutral';
+        if (roi > 0) roiClass = 'roi-positive';
+        if (roi < 0) roiClass = 'roi-negative';
+
+        // Bar calculation: baseline 100 is 50% width; max 200 is 100%
+        const fillPercent = Math.min(100, Math.max(0, (agent.capital / 200) * 100));
+        let fillClass = agent.role === 'AUDITOR' ? 'bar-fill auditor' : 'bar-fill';
+        if (agent.capital > 100) fillClass += ' profit';
+        if (isBankrupt) fillClass = 'bar-fill bankrupt';
+
+        const card = document.createElement('div');
+        card.className = `agent-card ${isBankrupt ? 'bankrupt' : ''}`;
+        card.id = `card-${agent.id}`;
+
+        card.innerHTML = `
+          <div class="agent-top">
+            <div class="agent-meta">
+              <span class="agent-id">
+                ${agent.id}
+              </span>
+              <span class="agent-model">${agent.model}</span>
+            </div>
+            <div class="agent-badges">
+              <span class="badge ${agent.role === 'GENERATOR' ? 'badge-generator' : 'badge-auditor'}">${agent.role}</span>
+              <span class="badge ${isBankrupt ? 'badge-bankrupt' : 'badge-active'}">
+                ${isBankrupt ? '💀 Bankrupt' : '● Active'}
+              </span>
+            </div>
+          </div>
+
+          <div class="capital-section">
+            <div class="capital-row">
+              <span class="capital-label">Capital Balance</span>
+              <div class="capital-value-wrap">
+                <span id="delta-${agent.id}" class="delta-indicator"></span>
+                <span class="capital-value">$${agent.capital.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div class="bar-track">
+              <div class="${fillClass}" style="width: ${fillPercent}%;"></div>
+            </div>
+          </div>
+
+          <div class="agent-footer">
+            <span>Reputation Collateral</span>
+            <span class="roi-badge ${roiClass}">
+              ROI: ${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%
+            </span>
+          </div>
+        `;
+
+        agentsContainer.appendChild(card);
+      });
+
+      metricSolvent.textContent = `${solventCount} / ${agents.length}`;
+      metricEconomy.textContent = totalEconomy.toFixed(2);
+    }
+
+    // -------------------------------------------------------------------------
+    // Feed Card Appender
+    // -------------------------------------------------------------------------
+    function appendEventCard(opts) {
+      if (emptyFeedState && emptyFeedState.parentNode) {
+        emptyFeedState.remove();
+      }
+
+      eventCounter++;
+      feedCount.textContent = `${eventCounter} events streamed`;
+
+      const card = document.createElement('div');
+      card.className = 'event-card';
+
+      const timeStr = new Date().toLocaleTimeString();
+
+      card.innerHTML = `
+        <div class="event-header">
+          <span class="event-badge-tag ${opts.badgeClass}">
+            ${opts.badgeText}
+          </span>
+          <span class="event-time">${timeStr}</span>
+        </div>
+        <div style="font-weight: 600; font-size: 0.95rem; color: #fff;">${opts.title}</div>
+        <div class="event-content">${opts.body}</div>
+      `;
+
+      eventsContainer.appendChild(card);
+
+      if (autoscrollToggle.checked) {
+        eventsContainer.scrollTop = eventsContainer.scrollHeight;
+      }
+    }
+
+    function clearFeed() {
+      eventsContainer.innerHTML = '';
+      eventCounter = 0;
+      feedCount.textContent = '0 events streamed';
+    }
+
+    function updateOracleMetrics() {
+      const total = oraclePassedCount + oracleFailedCount;
+      metricOracle.textContent = total.toString();
+      metricOracleSub.textContent = `${oraclePassedCount} passed / ${oracleFailedCount} failed`;
+    }
+
+    function setRunningState(running) {
+      isRunning = running;
+      if (running) {
+        startBtn.disabled = true;
+        startBtnText.textContent = 'Tournament in Progress...';
+        startBtn.innerHTML = '<span class="spinner"></span> <span>Running Tournament...</span>';
+      } else {
+        startBtn.disabled = false;
+        startBtnText.textContent = 'Replay Tournament';
+        startBtn.innerHTML = '<span>↻</span> <span>Replay Tournament</span>';
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Trigger Tournament
+    // -------------------------------------------------------------------------
+    async function triggerTournament() {
+      if (isRunning) return;
+
+      setRunningState(true);
+
+      try {
+        const res = await fetch('/api/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        const data = await res.json();
+        if (!data.ok) {
+          alert(`Could not start tournament: ${data.error}`);
+          setRunningState(false);
+        }
+      } catch (err) {
+        alert(`Network error starting tournament: ${err.message}`);
+        setRunningState(false);
+      }
+    }
+
+    function escapeHtml(text) {
+      if (typeof text !== 'string') return text;
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Initialize EventSource on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      initEventSource();
+    });
+  </script>
+</body>
+</html>
