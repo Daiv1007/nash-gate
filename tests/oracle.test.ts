@@ -163,6 +163,32 @@ test('Valid code: Markdown code fences stripped cleanly', async () => {
   assert.strictEqual(result.actualOutput, 81);
 });
 
+test('Valid code: Markdown code fence embedded in conversational text stripped cleanly', async () => {
+  const code = [
+    'Here is the solution to your problem:',
+    '```javascript',
+    'function doubleNumber(n) {',
+    '  return n * 2;',
+    '}',
+    '```',
+    'Let me know if you need any adjustments!',
+  ].join('\n');
+
+  const result = await executeInSandbox(code, 21, 42);
+  assert.strictEqual(result.verdict, 'PASSED');
+  assert.strictEqual(result.actualOutput, 42);
+});
+
+test('Valid code: module.exports object dictionary with named export function', async () => {
+  const code = `
+    function isEven(n) { return n % 2 === 0; }
+    module.exports = { isEven };
+  `;
+  const result = await executeInSandbox(code, 4, true, { entrypoint: 'isEven' });
+  assert.strictEqual(result.verdict, 'PASSED');
+  assert.strictEqual(result.actualOutput, true);
+});
+
 test('Valid code: Async function resolving promise handled properly', async () => {
   const code = `
     async function asyncAdd(a, b) {

@@ -164,6 +164,39 @@ describe('DashboardServer & Web Visualizer', () => {
     assert.equal(snapshot.lastResult.totalRoundsPlayed, 3);
   });
 
+  it('DashboardServer handleRequest accepts JSON body with custom model on POST /api/start', async () => {
+    const server = new DashboardServer({ paceMs: 1 });
+    let statusCode = 0;
+    let responseBody = '';
+
+    const mockReq: any = new EventEmitter();
+    mockReq.url = '/api/start';
+    mockReq.method = 'POST';
+    mockReq.headers = { host: 'localhost:3000', 'content-type': 'application/json' };
+
+    const mockRes: any = new EventEmitter();
+    mockRes.writeHead = (code: number) => {
+      statusCode = code;
+    };
+    mockRes.end = (content: string) => {
+      responseBody = content;
+    };
+
+    (server as any).handleRequest(mockReq, mockRes);
+
+    // Emit payload chunk and end
+    mockReq.emit('data', JSON.stringify({ model: 'my-chosen-model' }));
+    mockReq.emit('end');
+
+    // Wait microtask
+    await new Promise((r) => setTimeout(r, 50));
+
+    assert.equal(statusCode, 200);
+    const parsed = JSON.parse(responseBody);
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.model, 'my-chosen-model');
+  });
+
   it('createInitialAgents(true) dynamically resolves model for all agents based on env', () => {
     const originalEnv = { ...process.env };
     try {
@@ -173,7 +206,7 @@ describe('DashboardServer & Web Visualizer', () => {
       const geminiAgents = createInitialAgents(true);
       assert.equal(geminiAgents.length, 4);
       for (const a of geminiAgents) {
-        assert.equal(a.model, 'gemini-2.5-flash');
+        assert.equal(a.model, 'gemini-3.5-flash-lite');
       }
 
       // Test 2: Ollama 11434 url
@@ -191,6 +224,16 @@ describe('DashboardServer & Web Visualizer', () => {
       for (const a of customAgents) {
         assert.equal(a.model, 'deepseek-coder:6.7b');
       }
+
+      // Test 4: Custom defaultModel and per-agent agentModels
+      const customized = createInitialAgents(true, 'claude-3-5-sonnet', {
+        AlphaGen: 'gemini-3.8-flash',
+        BuggyGen: 'llama3.2',
+      });
+      assert.equal(customized.find((a) => a.id === 'AlphaGen')?.model, 'gemini-3.8-flash');
+      assert.equal(customized.find((a) => a.id === 'BuggyGen')?.model, 'llama3.2');
+      assert.equal(customized.find((a) => a.id === 'SharpAuditor')?.model, 'claude-3-5-sonnet');
+      assert.equal(customized.find((a) => a.id === 'RecklessAuditor')?.model, 'claude-3-5-sonnet');
     } finally {
       process.env = originalEnv;
     }
@@ -218,13 +261,229 @@ describe('DashboardServer & Web Visualizer', () => {
     server.broadcast('engine:error', {
       error: '404 Model Not Found',
       phase: 'proposal',
-      agent: { id: 'AlphaGen', model: 'gemini-2.5-flash' },
+      agent: { id: 'AlphaGen', model: 'gemini-3.8-flash' },
       roundNumber: 1,
     });
 
     const errorEvent = writes.find((w) => w.includes('event: engine:error'));
     assert.ok(errorEvent);
     assert.ok(errorEvent.includes('404 Model Not Found'));
-    assert.ok(errorEvent.includes('gemini-2.5-flash'));
+    assert.ok(errorEvent.includes('gemini-3.8-flash'));
+  });
+
+  it('DashboardServer replays event buffer to newly connected SSE clients', () => {
+    const server = new DashboardServer({ paceMs: 1 });
+
+    // Broadcast two events before client connects
+    server.broadcast('round:start', { roundNumber: 1 });
+    server.broadcast('proposal:submitted', { agent: { id: 'AlphaGen' } });
+
+    const writes: string[] = [];
+    const mockRes: any = new EventEmitter();
+    mockRes.write = (chunk: string) => {
+      writes.push(chunk);
+      return true;
+    };
+    mockRes.writeHead = () => {};
+
+    const mockReq: any = new EventEmitter();
+    mockReq.url = '/events';
+    mockReq.method = 'GET';
+    mockReq.headers = { host: 'localhost:3000' };
+
+    (server as any).handleRequest(mockReq, mockRes);
+
+    // Verify buffer was replayed
+    assert.ok(writes.some((w) => w.includes('event: round:start')));
+    assert.ok(writes.some((w) => w.includes('event: proposal:submitted')));
+  });
+
+  it('abortTournament and POST /api/reset gracefully resets state to STANDBY', async () => {
+    const server = new DashboardServer({ paceMs: 1 });
+    (server as any).isTournamentRunning = true;
+    (server as any).currentRoundNumber = 2;
+
+    const writes: string[] = [];
+    const mockRes: any = new EventEmitter();
+    mockRes.write = (chunk: string) => {
+      writes.push(chunk);
+      return true;
+    };
+    mockRes.writeHead = () => {};
+
+    const mockReq: any = new EventEmitter();
+    mockReq.url = '/events';
+    mockReq.method = 'GET';
+    mockReq.headers = { host: 'localhost:3000' };
+    (server as any).handleRequest(mockReq, mockRes);
+
+    // Call abortTournament
+    const res = server.abortTournament();
+    assert.equal(res.stopped, true);
+    assert.equal((server as any).isTournamentRunning, false);
+    assert.equal((server as any).currentRoundNumber, 0);
+
+    // Verify reset events were broadcasted
+    assert.ok(writes.some((w) => w.includes('event: tournament:reset')));
+    assert.ok(writes.some((w) => w.includes('event: tournament:state')));
+  });
+
+  it('DashboardServer startTournament respects custom rounds slice', async () => {
+    const server = new DashboardServer({ paceMs: 1 });
+    const writes: string[] = [];
+    const mockRes: any = new EventEmitter();
+    mockRes.write = (chunk: string) => {
+      writes.push(chunk);
+      return true;
+    };
+    mockRes.writeHead = () => {};
+    const mockReq: any = new EventEmitter();
+    mockReq.url = '/events';
+    mockReq.method = 'GET';
+    mockReq.headers = { host: 'localhost:3000' };
+    (server as any).handleRequest(mockReq, mockRes);
+
+    await server.startTournament({ rounds: 1 });
+    // Let tournament complete
+    await new Promise((r) => setTimeout(r, 80));
+
+    const startEvent = writes.find((w) => w.includes('event: tournament:start'));
+    assert.ok(startEvent, 'tournament:start event should be emitted');
+    assert.ok(startEvent.includes('"totalRounds":1'), 'Should slice to exactly 1 round');
+  });
+
+  it('DashboardServer handles /api/agents CRUD operations', async () => {
+    const server = new DashboardServer({ paceMs: 1 });
+
+    // 1. GET /api/agents
+    let getBody = '';
+    let getStatus = 0;
+    const mockResGet: any = new EventEmitter();
+    mockResGet.writeHead = (code: number) => { getStatus = code; };
+    mockResGet.end = (content: string) => { getBody = content; };
+    const mockReqGet: any = new EventEmitter();
+    mockReqGet.url = '/api/agents';
+    mockReqGet.method = 'GET';
+    mockReqGet.headers = { host: 'localhost:3000' };
+    (server as any).handleRequest(mockReqGet, mockResGet);
+
+    assert.equal(getStatus, 200);
+    const parsedGet = JSON.parse(getBody);
+    assert.equal(parsedGet.ok, true);
+    assert.equal(parsedGet.agents.length, 4);
+
+    // 2. POST /api/agents (Add custom agent)
+    let postBody = '';
+    let postStatus = 0;
+    const mockResPost: any = new EventEmitter();
+    mockResPost.writeHead = (code: number) => { postStatus = code; };
+    mockResPost.end = (content: string) => { postBody = content; };
+    const mockReqPost: any = new EventEmitter();
+    mockReqPost.url = '/api/agents';
+    mockReqPost.method = 'POST';
+    mockReqPost.headers = { host: 'localhost:3000' };
+    (server as any).handleRequest(mockReqPost, mockResPost);
+    mockReqPost.emit('data', JSON.stringify({
+      id: 'CustomGen1',
+      role: 'GENERATOR',
+      model: 'gemini-3.5-flash-lite',
+      capital: 150,
+      apiKey: 'test-secret-key',
+    }));
+    mockReqPost.emit('end');
+
+    assert.equal(postStatus, 200);
+    const parsedPost = JSON.parse(postBody);
+    assert.equal(parsedPost.ok, true);
+    assert.equal(parsedPost.agents.length, 5);
+    const customAgent = parsedPost.agents.find((a: any) => a.id === 'CustomGen1');
+    assert.ok(customAgent);
+    assert.equal(customAgent.hasDedicatedKey, true);
+    assert.equal(customAgent.apiKey, '••••••••', 'Raw API key should be masked');
+
+    // 3. DELETE /api/agents/CustomGen1
+    let delBody = '';
+    let delStatus = 0;
+    const mockResDel: any = new EventEmitter();
+    mockResDel.writeHead = (code: number) => { delStatus = code; };
+    mockResDel.end = (content: string) => { delBody = content; };
+    const mockReqDel: any = new EventEmitter();
+    mockReqDel.url = '/api/agents/CustomGen1';
+    mockReqDel.method = 'DELETE';
+    mockReqDel.headers = { host: 'localhost:3000' };
+    (server as any).handleRequest(mockReqDel, mockResDel);
+
+    assert.equal(delStatus, 200);
+    const parsedDel = JSON.parse(delBody);
+    assert.equal(parsedDel.ok, true);
+    assert.equal(parsedDel.agents.length, 4);
+
+    // 4. POST /api/agents/reset
+    let resetBody = '';
+    let resetStatus = 0;
+    const mockResReset: any = new EventEmitter();
+    mockResReset.writeHead = (code: number) => { resetStatus = code; };
+    mockResReset.end = (content: string) => { resetBody = content; };
+    const mockReqReset: any = new EventEmitter();
+    mockReqReset.url = '/api/agents/reset';
+    mockReqReset.method = 'POST';
+    mockReqReset.headers = { host: 'localhost:3000' };
+    (server as any).handleRequest(mockReqReset, mockResReset);
+
+    assert.equal(resetStatus, 200);
+    const parsedReset = JSON.parse(resetBody);
+    assert.equal(parsedReset.ok, true);
+    assert.equal(parsedReset.agents.length, 4);
+  });
+
+  it('DashboardServer startTournament executes with custom agent roster and per-agent credentials', async () => {
+    const server = new DashboardServer({ paceMs: 1 });
+    const writes: string[] = [];
+    const mockRes: any = new EventEmitter();
+    mockRes.write = (chunk: string) => {
+      writes.push(chunk);
+      return true;
+    };
+    mockRes.writeHead = () => {};
+    const mockReq: any = new EventEmitter();
+    mockReq.url = '/events';
+    mockReq.method = 'GET';
+    mockReq.headers = { host: 'localhost:3000' };
+    (server as any).handleRequest(mockReq, mockRes);
+
+    const customRoster = [
+      { id: 'CustomAlpha', role: 'GENERATOR' as const, model: 'gemini-3.5-flash-lite', capital: 120, apiKey: 'agent-key-1' },
+      { id: 'CustomSharp', role: 'AUDITOR' as const, model: 'gpt-4o-mini', capital: 100, apiKey: 'agent-key-2' },
+    ];
+
+    const startRes = await server.startTournament({
+      agents: customRoster,
+      rounds: 1,
+    });
+
+    assert.equal(startRes.started, true);
+    await new Promise((r) => setTimeout(r, 80));
+
+    const startEvent = writes.find((w) => w.includes('event: tournament:start'));
+    assert.ok(startEvent);
+    assert.ok(startEvent.includes('CustomAlpha'));
+    assert.ok(startEvent.includes('CustomSharp'));
+  });
+
+  it('DashboardServer startTournament rejects invalid roster missing auditors or generators', async () => {
+    const server = new DashboardServer({ paceMs: 1 });
+
+    const invalidRoster = [
+      { id: 'Gen1', role: 'GENERATOR' as const, model: 'gemini-3.5-flash-lite', capital: 100 },
+      { id: 'Gen2', role: 'GENERATOR' as const, model: 'gemini-3.5-flash-lite', capital: 100 },
+    ];
+
+    const startRes = await server.startTournament({
+      agents: invalidRoster,
+      rounds: 1,
+    });
+
+    assert.equal(startRes.started, false);
+    assert.ok(startRes.reason?.includes('AUDITOR'), 'Should reject roster without auditors');
   });
 });

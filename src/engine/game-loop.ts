@@ -66,6 +66,11 @@ export interface GameLoopHooks {
     problem: ProblemContext,
     activeAgents: readonly Agent[]
   ) => void | Promise<void>;
+  onAgentActionStart?: (
+    agent: Agent,
+    phase: 'proposal' | 'challenge',
+    targetGenerator?: Agent
+  ) => void | Promise<void>;
   onProposalSubmitted?: (proposal: Proposal, agent: Agent) => void | Promise<void>;
   onProposalRejected?: (agent: Agent, errors: readonly string[]) => void | Promise<void>;
   onChallengeSubmitted?: (
@@ -98,6 +103,7 @@ export interface RunRoundParams {
   readonly getAdapter: (agent: Agent) => AgentAdapter;
   readonly sandboxOptions?: SandboxOptions;
   readonly hooks?: GameLoopHooks;
+  readonly abortSignal?: AbortSignal;
 }
 
 /**
@@ -110,6 +116,7 @@ export interface RunTournamentParams {
   readonly maxRounds?: number;
   readonly sandboxOptions?: SandboxOptions;
   readonly hooks?: GameLoopHooks;
+  readonly abortSignal?: AbortSignal;
 }
 
 /**
@@ -158,7 +165,7 @@ function resolveAdapter(
  * @returns Immutable RoundResult with complete audit log.
  */
 export async function runRound(params: RunRoundParams): Promise<RoundResult> {
-  const { roundNumber, problem, agents, getAdapter, sandboxOptions, hooks } = params;
+  const { roundNumber, problem, agents, getAdapter, sandboxOptions, hooks, abortSignal } = params;
 
   // Step 1: Filter solvent agents.
   // Game-theoretic rationale: Insolvent agents possess zero collateral to back their stakes.
@@ -176,8 +183,11 @@ export async function runRound(params: RunRoundParams): Promise<RoundResult> {
   const generatorMap = new Map<string, Agent>();
 
   for (const generator of activeGenerators) {
+    if (abortSignal?.aborted) break;
     generatorMap.set(generator.id, generator);
     const adapter = getAdapter(generator);
+
+    await hooks?.onAgentActionStart?.(generator, 'proposal');
 
     try {
       const proposal = await adapter.generateProposal({
@@ -213,14 +223,18 @@ export async function runRound(params: RunRoundParams): Promise<RoundResult> {
   const auditorCumulativeStakes = new Map<string, number>();
 
   for (const auditor of activeAuditors) {
+    if (abortSignal?.aborted) break;
     const adapter = getAdapter(auditor);
     auditorCumulativeStakes.set(auditor.id, 0);
 
     for (const proposal of validProposals) {
+      if (abortSignal?.aborted) break;
       const targetGenerator = generatorMap.get(proposal.agentId);
       if (!targetGenerator || targetGenerator.id === auditor.id) {
         continue;
       }
+
+      await hooks?.onAgentActionStart?.(auditor, 'challenge', targetGenerator);
 
       try {
         const challenge = await adapter.generateChallenge({
@@ -344,7 +358,7 @@ export async function runRound(params: RunRoundParams): Promise<RoundResult> {
  * @returns TournamentResult summarizing rounds, leaderboard, and statistics.
  */
 export async function runTournament(params: RunTournamentParams): Promise<TournamentResult> {
-  const { agents: initialAgents, problems, adapter, maxRounds, sandboxOptions, hooks } = params;
+  const { agents: initialAgents, problems, adapter, maxRounds, sandboxOptions, hooks, abortSignal } = params;
 
   const agentMap = new Map<string, Agent>(initialAgents.map((a) => [a.id, a]));
   const getAdapter = (agent: Agent) => resolveAdapter(agent, adapter);
@@ -356,14 +370,25 @@ export async function runTournament(params: RunTournamentParams): Promise<Tourna
   let terminationReason = 'All scheduled rounds completed successfully.';
 
   for (let i = 0; i < limit; i++) {
+    if (abortSignal?.aborted) {
+      terminationReason = 'Consensus halted: Tournament aborted by user.';
+      break;
+    }
+
     const roundNumber = i + 1;
     const problem = { ...problems[i], round: roundNumber };
 
     const activeList = filterActiveAgents(Array.from(agentMap.values()));
     const activeGenerators = activeList.filter((a) => a.role === 'GENERATOR');
+    const activeAuditors = activeList.filter((a) => a.role === 'AUDITOR');
 
     if (activeGenerators.length === 0) {
       terminationReason = 'Consensus halted: all GENERATOR agents are BANKRUPT.';
+      break;
+    }
+
+    if (activeAuditors.length === 0) {
+      terminationReason = 'Consensus halted: all AUDITOR agents are BANKRUPT (arbitration impossible).';
       break;
     }
 
@@ -379,6 +404,7 @@ export async function runTournament(params: RunTournamentParams): Promise<Tourna
       getAdapter,
       sandboxOptions,
       hooks,
+      abortSignal,
     });
 
     rounds.push(roundResult);

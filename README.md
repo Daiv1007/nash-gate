@@ -4,7 +4,7 @@
 
 ![NashGate Real-Time Consensus Dashboard](assets/nash-gate-demo.gif)
 
-[![Tests](https://img.shields.io/badge/tests-104%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-131%20passing-brightgreen.svg)](tests/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Dependencies](https://img.shields.io/badge/dependencies-zero-success.svg)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-black.svg)](package.json)
@@ -106,7 +106,7 @@ git clone https://github.com/Daiv1007/nash-gate.git
 cd nash-gate
 npm test
 ```
-All 104 unit, oracle, adapter, settlement, and server tests will run with sub-second execution.
+All 131 unit, oracle, adapter, settlement, and server tests will run with sub-second execution.
 
 ### 2. Interactive CLI Demo
 
@@ -162,47 +162,102 @@ Open `http://localhost:3000` in any browser to watch:
 
 ---
 
-## 🤖 Live API Configuration
+## 🤖 Live API & Model Configuration
 
 NashGate supports live multi-model execution via `OpenAICompatibleAdapter` with zero third-party SDK dependencies (powered by Node native `fetch`).
 
-The engine features **Dynamic Model Resolution**, automatically discovering your target provider and default model:
-1. `LLM_MODEL`: Exact model name override (e.g. `llama3.2`, `gemini-2.5-flash`, `gpt-4o-mini`, `qwen2.5-coder:7b`).
-2. `LLM_API_KEY` starting with `AIza`: Defaults to `gemini-2.5-flash` and routes to Google's OpenAI-compatible endpoint.
-3. `LLM_BASE_URL` containing `11434` (Ollama): Defaults to `llama3.2` and routes to local Ollama.
-4. Fallback: Defaults to `gpt-4o-mini` (OpenAI).
+### Inserting Your API Key
 
-### Gemini
+There are two equally valid ways to provide your API key:
+
+**Option A — Paste in the Web UI (easiest):**
+1. Run `npm run ui` (no environment variable required).
+2. Open `http://localhost:3000` in your browser.
+3. Paste your key into the **API Key** field in the top header bar (👁 to reveal/mask it).
+4. Type your model name (e.g. `gemini-3.8-flash`) and click **Start Tournament**.
+
+The key is stored only in your browser's `sessionStorage` — it disappears when you close the tab and is never written to disk or logs.
+
+**Option B — Environment variable (for scripts / CI):**
+```powershell
+# PowerShell
+$env:LLM_API_KEY = "AQ.YourGeminiKey"
+# or:
+$env:LLM_API_KEY = "sk-proj-YourOpenAIKey"
+npm run ui
+# or:
+npm run demo -- --model=gemini-3.8-flash
+```
+
+Both methods work simultaneously — if a key is pasted in the UI, it takes priority over the environment variable for that tournament run.
+
+### Freedom of Model Selection
+Users are not locked into any default models. You have total freedom to specify:
+1. **In the Web Visualizer (`npm run ui`)**:
+   - **Header Model Selector**: Type or select any model name (`gemini-3.8-flash`, `gpt-4o`, `llama3.2`, `qwen2.5-coder:7b`, `deepseek-chat`, etc.) to apply globally across all agents.
+   - **Per-Agent Model Inputs**: Click on any agent card in the left panel to assign different models to individual agents (e.g. `AlphaGen` on `gemini-3.8-flash`, `BuggyGen` on `gpt-4o-mini`, `SharpAuditor` on `llama3.2`).
+2. **In the Interactive CLI (`npm run demo`)**:
+   - Global model flag: `npm run demo -- --model=gemini-3.8-flash`
+   - Per-agent flags: `npm run demo -- --alpha-model=gpt-4o --sharp-model=gemini-3.8-flash --reckless-model=llama3.2`
+   - Run `npm run demo -- --help` for full options.
+3. **Via Environment Variable**:
+   - `export LLM_MODEL="<your-model>"`
+
+### Dynamic Multi-Agent Roster & Per-Agent API Keys
+NashGate allows complete customization of the competing multi-agent economy:
+- **Per-Agent API Keys:** Instead of a single global key, you can assign dedicated API keys and base URLs to each individual agent. For example, Agent 1 can use Google Gemini with an AI Studio key, Agent 2 can run OpenAI with a Project Key, and Agent 3 can query a local Ollama instance on `http://localhost:11434/v1`.
+- **Dynamic Agent Creation:** Add custom agents at any time via the **+ Add Agent** button in the web visualizer or the REST API (`POST /api/agents`), configuring their ID, role, initial capital, model, and optional credentials.
+- **Dynamic Role Assignment:** Easily switch agents between `GENERATOR` and `AUDITOR` roles with a single click (`⇄` toggle) to experiment with different market equilibriums.
+- **Agent Roster Management API:**
+  - `GET /api/agents` — Fetch current agent roster with sensitive keys masked (`••••••••`).
+  - `POST /api/agents` — Create or update an agent.
+  - `DELETE /api/agents/:id` — Remove an agent from the roster.
+  - `POST /api/agents/reset` — Reset to default 4-agent benchmark setup.
+
+### Dynamic Model Resolution & Auto-Normalization
+When no custom model is explicitly specified, the engine discovers your target provider and default model:
+1. `LLM_MODEL`: Exact model name override.
+2. `LLM_API_KEY` starting with `AIza` or `AQ.` (Google AI Studio formats): Defaults to `gemini-3.8-flash` and routes to Google's OpenAI-compatible endpoint (`https://generativelanguage.googleapis.com/v1beta/openai`).
+3. `LLM_BASE_URL` containing `11434` (Ollama): Defaults to `llama3.2` and routes to local Ollama (`http://localhost:11434/v1`).
+4. Fallback: Defaults to `gpt-4o-mini` (`https://api.openai.com/v1`).
+
+> **Automatic Model Normalization:** Deprecated model names (such as Google's retired `gemini-2.5-flash`) and `models/` prefixes are automatically sanitized and upgraded to `gemini-3.8-flash` at both client and server boundaries, preventing 404 HTTP errors.
+
+### Provider Examples
+
+#### Google Gemini
 ```bash
-export LLM_API_KEY="AIzaSyYourGeminiApiKey"
-# Automatically resolves to 'gemini-2.5-flash' and connects to Google's OpenAI endpoint:
-# https://generativelanguage.googleapis.com/v1beta/openai
-npm run demo
+# Supports both Google AI Studio key formats: AIzaSy... or AQ.Ab8RN...
+export LLM_API_KEY="AQ.Ab8RNYourGeminiApiKey"
+npm run demo -- --model=gemini-3.8-flash
 # or npm run ui
 ```
 
-### Local Ollama
+#### Local Ollama
 ```bash
 export LLM_BASE_URL="http://localhost:11434/v1"
-# Automatically resolves model to 'llama3.2' (no API key required)
-npm run demo
+npm run demo -- --model=llama3.2
 # or npm run ui
 ```
 
-### OpenAI
+#### OpenAI
 ```bash
 export LLM_API_KEY="sk-proj-YourOpenAiKey"
-# Automatically defaults to 'gpt-4o-mini'
-npm run demo
+npm run demo -- --model=gpt-4o-mini
 # or npm run ui
 ```
 
-### Custom Model Override
+#### Mixed Multi-Model Tournament
 ```bash
-export LLM_MODEL="deepseek-coder:6.7b"
-export LLM_BASE_URL="http://localhost:11434/v1"
-npm run demo
+npm run demo -- --alpha-model=gpt-4o --buggy-model=gpt-4o-mini --sharp-model=gemini-3.8-flash --reckless-model=llama3.2
 ```
+
+### Transient Error Resilience
+During high-demand peak hours, commercial LLM APIs occasionally return **HTTP 503 Service Unavailable** ("This model is currently experiencing high demand. Spikes in demand are usually temporary.") or experience socket timeouts. NashGate handles this transparently — **always using the exact model you chose, never substituting**:
+- **Exponential Backoff:** Automatically retries transient 503, 429, 500, 502, 504, and socket timeout errors up to 3 times on the exact chosen model with exponential backoff + jitter (2 s base delay).
+- **No Silent Substitution:** The adapter strictly retries your chosen model. If transient failures persist after all retries, the error surfaces as a visible `engine:error` event in the UI or a red warning in the terminal — never a silent skip.
+- **Fast-Fail on Auth Errors:** HTTP 401 or non-retryable 400 errors (invalid API key, model not found) fail immediately on the first attempt without wasted retries.
+- **Reasoning Model Optimization:** For Gemini 3 series models (e.g. `gemini-3.8-flash`), `reasoning_effort: "low"` is automatically sent to suppress lengthy internal reasoning chains and prevent timeouts.
 
 ### Error Telemetry & Fault Visibility
 If an API key is invalid, an endpoint is unreachable, or a model is not found:
@@ -238,7 +293,7 @@ nash-gate/
 │   │   └── public/
 │   │       └── index.html     # Dark-mode reactive single-page dashboard
 │   └── demo.ts                # Terminal CLI demonstration
-├── tests/                     # 104 unit and integration tests
+├── tests/                     # 131 unit and integration tests
 ├── SPEC.md                    # Technical specification v0.1
 ├── AGENTS.md                  # Development principles & engineering rules
 └── package.json

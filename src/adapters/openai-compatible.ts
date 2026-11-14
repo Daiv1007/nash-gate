@@ -18,19 +18,58 @@ import type {
 } from './types.ts';
 
 /**
+ * Returns sibling model candidates for a given model family.
+ * Provided as a utility for external consumers; the core retry loop
+ * does NOT substitute models — it always retries the exact model chosen by the user.
+ */
+export function getModelFallbacks(modelName: string): string[] {
+  const clean = normalizeModelName(modelName).toLowerCase();
+  if (clean.includes('3.8') || clean.includes('2.5')) {
+    return ['gemini-1.5-flash', 'gemini-2.0-flash'];
+  }
+  if (clean.includes('2.0')) {
+    return ['gemini-1.5-flash'];
+  }
+  if (clean === 'gpt-4o') {
+    return ['gpt-4o-mini'];
+  }
+  return [];
+}
+
+/**
+ * Normalizes model names, stripping extraneous 'models/' prefixes for OpenAI compatibility endpoints.
+ * Automatically aliases retired models (e.g. gemini-2.5-flash-lite -> gemini-3.5-flash-lite).
+ */
+export function normalizeModelName(rawModel: string): string {
+  if (!rawModel) return 'gemini-3.5-flash-lite';
+  let trimmed = rawModel.trim();
+  if (trimmed.startsWith('models/')) {
+    trimmed = trimmed.substring('models/'.length);
+  }
+  if (trimmed.startsWith('gemini-2.5')) {
+    return 'gemini-3.5-flash-lite';
+  }
+  return trimmed;
+}
+
+/**
  * Resolves the default LLM model name dynamically based on environment variables:
  * 1. If process.env.LLM_MODEL is set, use that exact model name.
- * 2. Else if process.env.LLM_API_KEY starts with 'AIza', default to 'gemini-2.5-flash'.
- * 3. Else if process.env.LLM_BASE_URL includes '11434' (Ollama), default to 'llama3.2'.
- * 4. Otherwise fallback to 'gpt-4o-mini'.
+ * 2. Else if process.env.LLM_API_KEY starts with 'AIza' or 'AQ.', default to 'gemini-3.5-flash-lite'.
+ * 3. Else if process.env.GEMINI_API_KEY is present, default to 'gemini-3.5-flash-lite'.
+ * 4. Else if process.env.LLM_BASE_URL includes '11434' (Ollama), default to 'llama3.2'.
+ * 5. Otherwise fallback to 'gpt-4o-mini'.
  */
 export function resolveDefaultModel(): string {
   if (process.env.LLM_MODEL && process.env.LLM_MODEL.trim()) {
-    return process.env.LLM_MODEL.trim();
+    return normalizeModelName(process.env.LLM_MODEL);
   }
   const apiKey = process.env.LLM_API_KEY ?? process.env.GEMINI_API_KEY;
-  if (apiKey && apiKey.startsWith('AIza')) {
-    return 'gemini-2.5-flash';
+  if (apiKey && (apiKey.startsWith('AIza') || apiKey.startsWith('AQ.'))) {
+    return 'gemini-3.5-flash-lite';
+  }
+  if (process.env.GEMINI_API_KEY) {
+    return 'gemini-3.5-flash-lite';
   }
   const baseUrl = process.env.LLM_BASE_URL;
   if (baseUrl && baseUrl.includes('11434')) {
@@ -62,16 +101,26 @@ export function isLiveMode(): boolean {
 export function extractJsonFromText(rawText: string): unknown {
   const text = rawText.trim();
 
+  // Helper to remove illegal trailing commas: { "a": 1, } -> { "a": 1 }
+  const stripTrailingCommas = (s: string) => s.replace(/,\s*([}\]])/g, '$1');
+
   // 1. Direct JSON parse
   try {
     return JSON.parse(text);
+  } catch {}
+  try {
+    return JSON.parse(stripTrailingCommas(text));
   } catch {}
 
   // 2. Strip Markdown code fences: ```json ... ``` or ``` ... ```
   const fencedMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   if (fencedMatch) {
+    const fencedContent = fencedMatch[1].trim();
     try {
-      return JSON.parse(fencedMatch[1].trim());
+      return JSON.parse(fencedContent);
+    } catch {}
+    try {
+      return JSON.parse(stripTrailingCommas(fencedContent));
     } catch {}
   }
 
@@ -82,6 +131,9 @@ export function extractJsonFromText(rawText: string): unknown {
     const candidate = text.substring(firstBrace, lastBrace + 1);
     try {
       return JSON.parse(candidate);
+    } catch {}
+    try {
+      return JSON.parse(stripTrailingCommas(candidate));
     } catch {}
   }
 
@@ -119,13 +171,32 @@ export interface OpenAICompatibleAdapterConfig {
    */
   readonly temperature?: number;
   /**
-   * Network request timeout in milliseconds (default 30,000ms).
+   * Network request timeout in milliseconds (default 45,000ms).
    */
   readonly timeoutMs?: number;
+  /**
+   * Maximum retry attempts for transient capacity errors (HTTP 503, 429, timeouts).
+   * Default: 3 retries on the exact chosen model with exponential backoff.
+   */
+  readonly maxRetries?: number;
+  /**
+   * Base backoff delay between retry attempts in milliseconds. Default: 2,000ms.
+   */
+  readonly retryDelayMs?: number;
   /**
    * Injectable fetch implementation (primarily for deterministic unit testing).
    */
   readonly fetchFn?: typeof fetch;
+  /**
+   * Optional callback triggered when a transient error causes a retry.
+   */
+  readonly onRetry?: (info: {
+    model: string;
+    attempt: number;
+    maxRetries: number;
+    delayMs: number;
+    error: string;
+  }) => void;
 }
 
 /**
@@ -134,11 +205,20 @@ export interface OpenAICompatibleAdapterConfig {
 export class OpenAICompatibleAdapter implements AgentAdapter {
   readonly name: string;
   private readonly apiKey?: string;
-  private readonly baseUrl: string;
+  private readonly customBaseUrl?: string;
   private readonly defaultModel: string;
   private readonly temperature: number;
   private readonly timeoutMs: number;
+  private readonly maxRetries: number;
+  private readonly retryDelayMs: number;
   private readonly fetchFn: typeof fetch;
+  private readonly onRetry?: (info: {
+    model: string;
+    attempt: number;
+    maxRetries: number;
+    delayMs: number;
+    error: string;
+  }) => void;
 
   constructor(config?: OpenAICompatibleAdapterConfig) {
     this.name = config?.name ?? 'OpenAICompatibleAdapter';
@@ -148,50 +228,95 @@ export class OpenAICompatibleAdapter implements AgentAdapter {
       process.env.OPENAI_API_KEY ??
       process.env.GEMINI_API_KEY;
 
-    // Resolve base URL
     if (config?.baseUrl) {
-      this.baseUrl = config.baseUrl.replace(/\/+$/, '');
+      this.customBaseUrl = config.baseUrl.replace(/\/+$/, '');
     } else if (process.env.LLM_BASE_URL) {
-      this.baseUrl = process.env.LLM_BASE_URL.replace(/\/+$/, '');
-    } else if (this.apiKey && this.apiKey.startsWith('AIza')) {
-      // Gemini's OpenAI-compatible endpoint
-      this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta/openai';
-    } else if (this.apiKey) {
-      this.baseUrl = 'https://api.openai.com/v1';
-    } else {
-      // Local Ollama default
-      this.baseUrl = 'http://localhost:11434/v1';
+      this.customBaseUrl = process.env.LLM_BASE_URL.replace(/\/+$/, '');
     }
 
-    this.defaultModel = config?.model ?? resolveDefaultModel();
+    this.defaultModel = config?.model ? normalizeModelName(config.model) : resolveDefaultModel();
     this.temperature = config?.temperature ?? 0.2;
-    this.timeoutMs = config?.timeoutMs ?? 30_000;
+    this.timeoutMs = config?.timeoutMs ?? 60_000;
+    this.maxRetries = config?.maxRetries ?? 2;
+    this.retryDelayMs = config?.retryDelayMs ?? 1_500;
     this.fetchFn = config?.fetchFn ?? globalThis.fetch;
+    this.onRetry = config?.onRetry;
   }
 
   /**
-   * Dispatches a chat completion call enforcing strict JSON response format.
+   * Resolves the appropriate base URL for a given model identifier.
    */
-  private async callChatCompletion(
+  public resolveBaseUrlForModel(model?: string): string {
+    if (this.customBaseUrl) {
+      return this.customBaseUrl;
+    }
+    const targetModel = normalizeModelName(model || this.defaultModel).toLowerCase();
+    if (
+      targetModel.includes('gemini') ||
+      (this.apiKey && (this.apiKey.startsWith('AIza') || this.apiKey.startsWith('AQ.'))) ||
+      process.env.GEMINI_API_KEY
+    ) {
+      return 'https://generativelanguage.googleapis.com/v1beta/openai';
+    }
+    if (
+      targetModel.includes('llama') ||
+      targetModel.includes('ollama') ||
+      targetModel.includes('deepseek') ||
+      targetModel.includes('qwen') ||
+      targetModel.includes('mistral') ||
+      targetModel.includes('phi') ||
+      targetModel.includes(':')
+    ) {
+      return 'http://localhost:11434/v1';
+    }
+    if (this.apiKey) {
+      return 'https://api.openai.com/v1';
+    }
+    return 'http://localhost:11434/v1';
+  }
+
+  /**
+   * Base URL accessor for backwards compatibility.
+   */
+  get baseUrl(): string {
+    return this.resolveBaseUrlForModel(this.defaultModel);
+  }
+
+  /**
+   * Executes a single chat completion attempt with strict timeout and response_format fallback.
+   */
+  private async executeSingleChatCompletion(
     messages: readonly { role: string; content: string }[],
-    modelOverride?: string
+    model: string
   ): Promise<string> {
-    const endpoint = `${this.baseUrl}/chat/completions`;
-    const model = modelOverride || this.defaultModel;
+    const baseUrl = this.resolveBaseUrlForModel(model);
+    const endpoint = `${baseUrl}/chat/completions`;
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
     if (this.apiKey) {
       headers['Authorization'] = `Bearer ${this.apiKey}`;
+      // Google Generative Language endpoint supports and often prefers x-goog-api-key header
+      if (this.apiKey.startsWith('AIza') || this.apiKey.startsWith('AQ.')) {
+        headers['x-goog-api-key'] = this.apiKey;
+      }
     }
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       model,
       messages,
       response_format: { type: 'json_object' },
       temperature: this.temperature,
     };
+
+    // For reasoning models (e.g. Gemini 3 series like gemini-3.8-flash, o1, o3):
+    // Configure reasoning_effort: "low" so the model delivers code generation directly without
+    // prolonged internal thinking delays or high-demand capacity exhaustion.
+    const lowerModel = model.toLowerCase();
+    if (lowerModel.includes('gemini-3') || lowerModel.includes('o1') || lowerModel.includes('o3')) {
+      payload['reasoning_effort'] = 'low';
+    }
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -204,11 +329,11 @@ export class OpenAICompatibleAdapter implements AgentAdapter {
         signal: controller.signal,
       });
 
-      // Handle providers that reject response_format: { type: "json_object" }
+      // Handle providers that reject response_format or reasoning_effort with HTTP 400
       if (!response.ok && response.status === 400) {
         const errorBody = await response.text();
-        if (/response_format/i.test(errorBody)) {
-          // Retry without response_format
+        if (/response_format|reasoning_effort|extra_fields/i.test(errorBody)) {
+          // Retry with baseline payload without optional fields
           const fallbackPayload = {
             model,
             messages,
@@ -221,17 +346,21 @@ export class OpenAICompatibleAdapter implements AgentAdapter {
             signal: controller.signal,
           });
         } else {
-          throw new Error(
+          const err = new Error(
             `[OpenAICompatibleAdapter] HTTP ${response.status} Error: ${errorBody}`
           );
+          (err as any).status = response.status;
+          throw err;
         }
       }
 
       if (!response.ok) {
         const errText = await response.text();
-        throw new Error(
+        const err = new Error(
           `[OpenAICompatibleAdapter] HTTP ${response.status} ${response.statusText}: ${errText}`
         );
+        (err as any).status = response.status;
+        throw err;
       }
 
       const data = (await response.json()) as any;
@@ -245,14 +374,87 @@ export class OpenAICompatibleAdapter implements AgentAdapter {
       return content;
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        throw new Error(
+        const timeoutErr = new Error(
           `[OpenAICompatibleAdapter] Request timed out after ${this.timeoutMs}ms.`
         );
+        (timeoutErr as any).isTimeout = true;
+        throw timeoutErr;
       }
       throw err;
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /**
+   * Dispatches a chat completion call with automatic transient retry (HTTP 503/429/timeouts)
+   * strictly adhering to the exact model chosen by the user.
+   */
+  private async callChatCompletion(
+    messages: readonly { role: string; content: string }[],
+    modelOverride?: string
+  ): Promise<string> {
+    const rawModel = modelOverride || this.defaultModel;
+    let model = normalizeModelName(rawModel);
+
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      if (attempt > 0) {
+        // Exponential backoff with jitter on the exact model the user chose
+        const delay = Math.round(this.retryDelayMs * Math.pow(1.8, attempt - 1) + Math.random() * 400);
+        this.onRetry?.({
+          model,
+          attempt,
+          maxRetries: this.maxRetries,
+          delayMs: delay,
+          error: lastError?.message || 'Transient network or capacity error',
+        });
+        await new Promise((r) => setTimeout(r, delay));
+      }
+
+      try {
+        return await this.executeSingleChatCompletion(messages, model);
+      } catch (err: any) {
+        lastError = err;
+        const status = err.status || 0;
+
+        // Auto-heal retired Google models: if Google returns 404 telling to use gemini-3.5-flash-lite
+        if (status === 404 && /no longer available|gemini-3\.5-flash-lite|NOT_FOUND/i.test(err.message)) {
+          if (model !== 'gemini-3.5-flash-lite') {
+            model = 'gemini-3.5-flash-lite';
+            continue;
+          }
+        }
+
+        const isTimeout = Boolean(err.isTimeout);
+
+        // Daily quota exhaustion (e.g. 20 requests/day free tier limit on gemini-3.8-flash):
+        // Retrying within seconds is futile and wastes time; abort immediately with actionable advice.
+        const isDailyQuotaExhausted = /per day limit exceeded|GenerateRequestsPerDay|retry in \d+h/i.test(err.message);
+        if (isDailyQuotaExhausted) {
+          throw new Error(
+            `[OpenAICompatibleAdapter] Free Tier Daily Quota Exceeded for ${model}: ${err.message}. Switch model to gemini-3.5-flash-lite or gemini-1.5-flash or clear API key for Offline Mock mode.`
+          );
+        }
+
+        const isTransient =
+          isTimeout ||
+          status === 503 ||
+          status === 429 ||
+          status === 500 ||
+          status === 502 ||
+          status === 504 ||
+          /high demand|spikes in demand|rate limit|quota|temporarily unavailable|server error/i.test(err.message);
+
+        if (!isTransient) {
+          // Fatal error like 401 Unauthorized or 400 Bad Request: fail immediately without wasteful retries
+          throw err;
+        }
+      }
+    }
+
+    throw lastError || new Error(`[OpenAICompatibleAdapter] All retry attempts failed for ${model}`);
   }
 
   /**

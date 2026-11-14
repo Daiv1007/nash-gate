@@ -26,6 +26,8 @@ export interface Agent {
   readonly model: string;
   readonly capital: number;
   readonly status: AgentStatus;
+  readonly apiKey?: string;
+  readonly baseUrl?: string;
 }
 
 /**
@@ -124,6 +126,8 @@ export interface CreateAgentParams {
   readonly role: AgentRole;
   readonly model: string;
   readonly capital?: number;
+  readonly apiKey?: string;
+  readonly baseUrl?: string;
 }
 
 /**

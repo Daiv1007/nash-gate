@@ -11,6 +11,7 @@ import {
   validateProposal,
   validateChallenge,
   validateRoundParticipation,
+  validateAgentRoster,
   DEFAULT_INITIAL_CAPITAL,
   MIN_STAKE,
 } from '../src/core/index.ts';
@@ -305,4 +306,49 @@ test('validateRoundParticipation detects over-committed cumulative stakes', () =
   const res = validateRoundParticipation([auditor, gen1, gen2], proposals, challenges);
   assert.strictEqual(res.valid, false);
   assert.match(res.errors[0], /over-committed capital/);
+});
+
+test('validateAgentRoster accepts valid roster with at least 1 generator and 1 auditor', () => {
+  const roster = [
+    createAgent({ id: 'G1', role: 'GENERATOR', model: 'm1', capital: 100 }),
+    createAgent({ id: 'A1', role: 'AUDITOR', model: 'm2', capital: 100 }),
+  ];
+  const res = validateAgentRoster(roster);
+  assert.strictEqual(res.valid, true);
+  assert.strictEqual(res.errors.length, 0);
+});
+
+test('validateAgentRoster rejects roster with fewer than 2 agents', () => {
+  const roster = [createAgent({ id: 'G1', role: 'GENERATOR', model: 'm1', capital: 100 })];
+  const res = validateAgentRoster(roster);
+  assert.strictEqual(res.valid, false);
+  assert.match(res.errors[0], /at least 2 agents/);
+});
+
+test('validateAgentRoster rejects duplicate agent IDs', () => {
+  const roster = [
+    createAgent({ id: 'DuplicateId', role: 'GENERATOR', model: 'm1', capital: 100 }),
+    createAgent({ id: 'DuplicateId', role: 'AUDITOR', model: 'm2', capital: 100 }),
+  ];
+  const res = validateAgentRoster(roster);
+  assert.strictEqual(res.valid, false);
+  assert.match(res.errors[0], /Duplicate agent ID/);
+});
+
+test('validateAgentRoster rejects roster with no active generators or no active auditors', () => {
+  const noAuditors = [
+    createAgent({ id: 'G1', role: 'GENERATOR', model: 'm1', capital: 100 }),
+    createAgent({ id: 'G2', role: 'GENERATOR', model: 'm2', capital: 100 }),
+  ];
+  const resNoAud = validateAgentRoster(noAuditors);
+  assert.strictEqual(resNoAud.valid, false);
+  assert.match(resNoAud.errors[0], /at least one active AUDITOR/);
+
+  const noGenerators = [
+    createAgent({ id: 'A1', role: 'AUDITOR', model: 'm1', capital: 100 }),
+    createAgent({ id: 'A2', role: 'AUDITOR', model: 'm2', capital: 100 }),
+  ];
+  const resNoGen = validateAgentRoster(noGenerators);
+  assert.strictEqual(resNoGen.valid, false);
+  assert.match(resNoGen.errors[0], /at least one active GENERATOR/);
 });

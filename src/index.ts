@@ -26,4 +26,5 @@ export {
   DEFAULT_PORT,
   DEFAULT_PACE_DELAY_MS,
   type DashboardServerOptions,
+  type StartTournamentOptions,
 } from './server/dashboard.ts';

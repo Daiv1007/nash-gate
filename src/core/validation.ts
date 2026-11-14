@@ -70,6 +70,12 @@ export function createAgent(params: CreateAgentParams): Agent {
     model: params.model.trim(),
     capital: initialCapital,
     status: initialCapital <= 0 ? 'BANKRUPT' : 'ACTIVE',
+    ...(params.apiKey && typeof params.apiKey === 'string' && params.apiKey.trim()
+      ? { apiKey: params.apiKey.trim() }
+      : {}),
+    ...(params.baseUrl && typeof params.baseUrl === 'string' && params.baseUrl.trim()
+      ? { baseUrl: params.baseUrl.trim() }
+      : {}),
   };
 }
 
@@ -283,6 +289,69 @@ export function validateRoundParticipation(
         `Agent '${agentId}' has over-committed capital: total stake across round (${totalStake}) exceeds capital (${agent.capital}).`
       );
     }
+  }
+
+  return errors.length === 0 ? ok() : fail(...errors);
+}
+
+/**
+ * Validates a complete roster of agents before tournament initialization.
+ * Enforces mechanism requirements:
+ * 1. At least 2 active agents total.
+ * 2. At least 1 GENERATOR agent (to propose solutions).
+ * 3. At least 1 AUDITOR agent (to audit proposals and prevent sybil free-riding).
+ * 4. Strictly unique agent IDs.
+ * 5. Valid initial capital >= MIN_STAKE for all active agents.
+ *
+ * @param agents - Array of agents to validate.
+ * @returns ValidationResult summarizing roster readiness.
+ */
+export function validateAgentRoster(agents: readonly Agent[]): ValidationResult {
+  const errors: string[] = [];
+
+  if (!agents || agents.length < 2) {
+    return fail('Tournament requires at least 2 agents to run consensus arbitration.');
+  }
+
+  const seenIds = new Set<string>();
+  let generatorCount = 0;
+  let auditorCount = 0;
+
+  for (const agent of agents) {
+    if (!agent.id || !agent.id.trim()) {
+      errors.push('Agent with empty or missing ID detected.');
+      continue;
+    }
+
+    const cleanId = agent.id.trim();
+    if (seenIds.has(cleanId)) {
+      errors.push(`Duplicate agent ID '${cleanId}' detected in roster.`);
+    }
+    seenIds.add(cleanId);
+
+    if (agent.role === 'GENERATOR') {
+      if (agent.status === 'ACTIVE') generatorCount++;
+    } else if (agent.role === 'AUDITOR') {
+      if (agent.status === 'ACTIVE') auditorCount++;
+    } else {
+      errors.push(`Agent '${cleanId}' has invalid role '${(agent as any).role}'.`);
+    }
+
+    if (typeof agent.capital !== 'number' || Number.isNaN(agent.capital) || !Number.isFinite(agent.capital)) {
+      errors.push(`Agent '${cleanId}' has invalid capital value '${agent.capital}'.`);
+    } else if (agent.status === 'ACTIVE' && agent.capital < MIN_STAKE) {
+      errors.push(
+        `Active agent '${cleanId}' must have capital >= ${MIN_STAKE} (received: ${agent.capital}).`
+      );
+    }
+  }
+
+  if (generatorCount === 0) {
+    errors.push('Roster must contain at least one active GENERATOR agent.');
+  }
+
+  if (auditorCount === 0) {
+    errors.push('Roster must contain at least one active AUDITOR agent.');
   }
 
   return errors.length === 0 ? ok() : fail(...errors);

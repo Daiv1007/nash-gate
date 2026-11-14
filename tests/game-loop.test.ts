@@ -259,6 +259,40 @@ test('runTournament: Early halting when all generators go bankrupt', async () =>
   assert.ok(tournamentResult.terminationReason.includes('GENERATOR agents are BANKRUPT'));
 });
 
+test('runTournament: Early halting when all auditors go bankrupt', async () => {
+  // AlphaGen (capital: 100), RecklessAuditor (capital: 10)
+  const agents: Agent[] = [
+    createAgent({ id: 'AlphaGen', role: 'GENERATOR', model: 'solid', capital: 100 }),
+    createAgent({ id: 'RecklessAuditor', role: 'AUDITOR', model: 'reckless', capital: 10 }),
+  ];
+
+  // Generator passes, reckless auditor loses 1.5 * 10 = 15 -> bankrupt
+  const adapter = new MockAdapter({
+    proposalHandler: () => ({
+      solution: 'function isPalindrome(s) { return true; }',
+      stake: 20,
+      reasoning: 'Solid',
+    }),
+    challengeHandler: () => ({
+      shouldChallenge: true,
+      testInput: 'racecar',
+      expectedOutput: true,
+      stake: 10,
+    }),
+  });
+
+  const tournamentResult = await runTournament({
+    agents,
+    problems: [problem1, problem2, problem3],
+    adapter,
+  });
+
+  assert.equal(tournamentResult.totalRoundsPlayed, 1);
+  assert.equal(tournamentResult.bankruptAgents.length, 1);
+  assert.equal(tournamentResult.bankruptAgents[0].id, 'RecklessAuditor');
+  assert.ok(tournamentResult.terminationReason.includes('AUDITOR agents are BANKRUPT'));
+});
+
 // ---------------------------------------------------------------------------
 // 3. Error Telemetry Hook Tests (onError)
 // ---------------------------------------------------------------------------

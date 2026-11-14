@@ -9,8 +9,11 @@ import assert from 'node:assert/strict';
 import {
   MockAdapter,
   OpenAICompatibleAdapter,
+  createAgentAdapter,
   extractJsonFromText,
   resolveDefaultModel,
+  normalizeModelName,
+  getModelFallbacks,
   type ProblemContext,
 } from '../src/adapters/index.ts';
 import { createAgent } from '../src/core/index.ts';
@@ -244,6 +247,67 @@ test('extractJsonFromText: throws clean error when no JSON can be parsed', () =>
   );
 });
 
+test('extractJsonFromText: tolerates trailing commas in objects and arrays emitted by small LLMs', () => {
+  const input = `{
+    "solution": "function solve() { return true; }",
+    "stake": 30,
+    "reasoning": "Valid with trailing comma",
+  }`;
+  const result = extractJsonFromText(input) as any;
+  assert.equal(result.stake, 30);
+  assert.equal(result.solution, 'function solve() { return true; }');
+  assert.equal(result.reasoning, 'Valid with trailing comma');
+});
+
+test('createAgentAdapter: dynamically routes to OpenAICompatibleAdapter when agent has dedicated apiKey', () => {
+  const agent = createAgent({
+    id: 'AgentGemini',
+    role: 'GENERATOR',
+    model: 'gemini-3.5-flash-lite',
+    capital: 100,
+    apiKey: 'AIzaSyTestDedicatedKey',
+  });
+  const adapter = createAgentAdapter(agent);
+  assert.ok(adapter instanceof OpenAICompatibleAdapter);
+  assert.equal((adapter as any).apiKey, 'AIzaSyTestDedicatedKey');
+  assert.equal((adapter as any).defaultModel, 'gemini-3.5-flash-lite');
+});
+
+test('createAgentAdapter: routes to local Ollama when agent has custom baseUrl', () => {
+  const agent = createAgent({
+    id: 'AgentOllama',
+    role: 'AUDITOR',
+    model: 'llama3.2',
+    capital: 100,
+    baseUrl: 'http://localhost:11434/v1',
+  });
+  const adapter = createAgentAdapter(agent);
+  assert.ok(adapter instanceof OpenAICompatibleAdapter);
+  assert.equal((adapter as any).resolveBaseUrlForModel(), 'http://localhost:11434/v1');
+});
+
+test('createAgentAdapter: falls back to MockAdapter when no credentials are provided and offline', () => {
+  const origEnv = { ...process.env };
+  delete process.env.LLM_API_KEY;
+  delete process.env.LLM_BASE_URL;
+  delete process.env.LLM_MODEL;
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.GEMINI_API_KEY;
+
+  try {
+    const agent = createAgent({
+      id: 'OfflineGen',
+      role: 'GENERATOR',
+      model: 'mock-model',
+      capital: 100,
+    });
+    const adapter = createAgentAdapter(agent);
+    assert.ok(adapter instanceof MockAdapter);
+  } finally {
+    process.env = origEnv;
+  }
+});
+
 // ---------------------------------------------------------------------------
 // 3. OpenAICompatibleAdapter Tests (Using Mock Fetch)
 // ---------------------------------------------------------------------------
@@ -464,7 +528,7 @@ test('resolveDefaultModel: returns exact model name when LLM_MODEL is set', () =
   }
 });
 
-test('resolveDefaultModel: defaults to gemini-2.5-flash when LLM_API_KEY starts with AIza', () => {
+test('resolveDefaultModel: defaults to gemini-3.5-flash-lite when LLM_API_KEY starts with AIza', () => {
   const originalEnv = { ...process.env };
   try {
     delete process.env.LLM_MODEL;
@@ -472,10 +536,31 @@ test('resolveDefaultModel: defaults to gemini-2.5-flash when LLM_API_KEY starts 
     process.env.LLM_BASE_URL = 'http://localhost:11434/v1';
 
     // AIza key takes precedence over 11434 base URL
-    assert.equal(resolveDefaultModel(), 'gemini-2.5-flash');
+    assert.equal(resolveDefaultModel(), 'gemini-3.5-flash-lite');
   } finally {
     process.env = originalEnv;
   }
+});
+
+test('resolveDefaultModel: defaults to gemini-3.5-flash-lite when LLM_API_KEY starts with AQ. (Google AI Studio format)', () => {
+  const originalEnv = { ...process.env };
+  try {
+    delete process.env.LLM_MODEL;
+    process.env.LLM_API_KEY = 'AQ.Ab8RNFakeKey123';
+    process.env.LLM_BASE_URL = 'http://localhost:11434/v1';
+
+    assert.equal(resolveDefaultModel(), 'gemini-3.5-flash-lite');
+  } finally {
+    process.env = originalEnv;
+  }
+});
+
+test('OpenAICompatibleAdapter: routes to Google Generative Language endpoint for AQ. keys and gemini models', () => {
+  const adapterWithKey = new OpenAICompatibleAdapter({ apiKey: 'AQ.Ab8RNTestKey' });
+  assert.equal((adapterWithKey as any).baseUrl, 'https://generativelanguage.googleapis.com/v1beta/openai');
+
+  const adapterWithModel = new OpenAICompatibleAdapter({ model: 'gemini-3.5-flash-lite', apiKey: 'custom-key' });
+  assert.equal((adapterWithModel as any).baseUrl, 'https://generativelanguage.googleapis.com/v1beta/openai');
 });
 
 test('resolveDefaultModel: defaults to llama3.2 when LLM_BASE_URL contains 11434 (Ollama)', () => {
@@ -517,4 +602,217 @@ test('resolveDefaultModel: falls back to gpt-4o-mini when non-AIza key and non-1
   } finally {
     process.env = originalEnv;
   }
+});
+
+test('normalizeModelName: upgrades retired gemini-2.5 models to gemini-3.5-flash-lite and strips models/ prefix', () => {
+  assert.equal(normalizeModelName('gemini-2.5-flash'), 'gemini-3.5-flash-lite');
+  assert.equal(normalizeModelName('gemini-2.5-flash-lite'), 'gemini-3.5-flash-lite');
+  assert.equal(normalizeModelName('models/gemini-2.5-flash-lite'), 'gemini-3.5-flash-lite');
+  assert.equal(normalizeModelName('models/gemini-3.5-flash-lite'), 'gemini-3.5-flash-lite');
+  assert.equal(normalizeModelName('  gemini-2.5-flash  '), 'gemini-3.5-flash-lite');
+  assert.equal(normalizeModelName('gemini-1.5-flash'), 'gemini-1.5-flash');
+  assert.equal(normalizeModelName('gpt-4o'), 'gpt-4o');
+  assert.equal(normalizeModelName('llama3.2'), 'llama3.2');
+});
+
+test('OpenAICompatibleAdapter: preserves agent model even when agent specifies gemini-3.5-flash-lite', async () => {
+  let capturedBody: any = null;
+  const mockFetch: typeof fetch = async (_url, init) => {
+    capturedBody = JSON.parse(init?.body as string);
+    return new Response(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                solution: 'function isPalindrome(s) { return true; }',
+                stake: 20,
+                reasoning: 'Normalized test',
+              }),
+            },
+          },
+        ],
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  };
+
+  const adapter = new OpenAICompatibleAdapter({
+    model: 'gemini-3.5-flash-lite',
+    apiKey: 'AQ.TestKey',
+    fetchFn: mockFetch,
+  });
+
+  const agent = createAgent({
+    id: 'AlphaGen',
+    role: 'GENERATOR',
+    model: 'gemini-3.5-flash-lite',
+    capital: 100,
+  });
+
+  await adapter.generateProposal({ agent, problem: testProblem });
+
+  assert.ok(capturedBody !== null);
+  assert.equal(capturedBody.model, 'gemini-3.5-flash-lite');
+});
+
+test('OpenAICompatibleAdapter: routes Ollama models to localhost:11434', () => {
+  const adapter = new OpenAICompatibleAdapter();
+  assert.equal(adapter.resolveBaseUrlForModel('llama3.2'), 'http://localhost:11434/v1');
+  assert.equal(adapter.resolveBaseUrlForModel('qwen2.5-coder:7b'), 'http://localhost:11434/v1');
+  assert.equal(adapter.resolveBaseUrlForModel('deepseek-chat'), 'http://localhost:11434/v1');
+});
+
+test('getModelFallbacks: returns fallback candidates for models', () => {
+  assert.deepEqual(getModelFallbacks('gemini-3.8-flash'), ['gemini-1.5-flash', 'gemini-2.0-flash']);
+  assert.deepEqual(getModelFallbacks('gemini-2.0-flash'), ['gemini-1.5-flash']);
+  assert.deepEqual(getModelFallbacks('gpt-4o'), ['gpt-4o-mini']);
+  assert.deepEqual(getModelFallbacks('llama3.2'), []);
+});
+
+test('OpenAICompatibleAdapter: retries transient 503 Service Unavailable and recovers', async () => {
+  let attemptCount = 0;
+  const mockFetch: typeof fetch = async () => {
+    attemptCount++;
+    if (attemptCount === 1) {
+      return new Response(
+        JSON.stringify({ error: { message: 'This model is currently experiencing high demand.' } }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    return new Response(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                solution: 'function isPalindrome(s) { return true; }',
+                stake: 25,
+                reasoning: 'Recovered from 503',
+              }),
+            },
+          },
+        ],
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  };
+
+  const adapter = new OpenAICompatibleAdapter({
+    model: 'gemini-1.5-flash',
+    apiKey: 'AQ.TestKey',
+    maxRetries: 2,
+    retryDelayMs: 10,
+    fetchFn: mockFetch,
+  });
+
+  const agent = createAgent({
+    id: 'AlphaGen',
+    role: 'GENERATOR',
+    model: 'gemini-1.5-flash',
+    capital: 100,
+  });
+
+  const proposal = await adapter.generateProposal({ agent, problem: testProblem });
+  assert.equal(attemptCount, 2);
+  assert.equal(proposal.agentId, 'AlphaGen');
+  assert.equal(proposal.stake, 25);
+});
+
+test('OpenAICompatibleAdapter: configures reasoning_effort: "low" on Gemini 3 models', async () => {
+  let capturedBody: any = null;
+  const mockFetch: typeof fetch = async (_url, init) => {
+    capturedBody = JSON.parse(init?.body as string);
+    return new Response(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                solution: 'function isPalindrome(s) { return true; }',
+                stake: 30,
+                reasoning: 'Reasoning effort low test',
+              }),
+            },
+          },
+        ],
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  };
+
+  const adapter = new OpenAICompatibleAdapter({
+    model: 'gemini-3.8-flash',
+    apiKey: 'AQ.TestKey',
+    fetchFn: mockFetch,
+  });
+
+  const agent = createAgent({
+    id: 'AlphaGen',
+    role: 'GENERATOR',
+    model: 'gemini-3.8-flash',
+    capital: 100,
+  });
+
+  await adapter.generateProposal({ agent, problem: testProblem });
+
+  assert.equal(capturedBody.model, 'gemini-3.8-flash');
+  assert.equal(capturedBody.reasoning_effort, 'low');
+});
+
+test('OpenAICompatibleAdapter: strictly retries the exact chosen model without substituting models', async () => {
+  const attemptedModels: string[] = [];
+  let attempts = 0;
+  const mockFetch: typeof fetch = async (_url, init) => {
+    attempts++;
+    const body = JSON.parse(init?.body as string);
+    attemptedModels.push(body.model);
+
+    if (attempts === 1) {
+      return new Response(
+        JSON.stringify({ error: { message: 'High demand spike' } }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                solution: 'function isPalindrome(s) { return true; }',
+                stake: 30,
+                reasoning: 'Generated by exact model after retry',
+              }),
+            },
+          },
+        ],
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  };
+
+  const adapter = new OpenAICompatibleAdapter({
+    model: 'gemini-3.8-flash',
+    apiKey: 'AQ.TestKey',
+    maxRetries: 2,
+    retryDelayMs: 10,
+    fetchFn: mockFetch,
+  });
+
+  const agent = createAgent({
+    id: 'AlphaGen',
+    role: 'GENERATOR',
+    model: 'gemini-3.8-flash',
+    capital: 100,
+  });
+
+  const proposal = await adapter.generateProposal({ agent, problem: testProblem });
+
+  // Both attempts strictly used the exact chosen model 'gemini-3.8-flash'
+  assert.equal(attempts, 2);
+  assert.equal(attemptedModels.length, 2);
+  assert.ok(attemptedModels.every((m) => m === 'gemini-3.8-flash'));
+  assert.equal(proposal.agentId, 'AlphaGen');
 });

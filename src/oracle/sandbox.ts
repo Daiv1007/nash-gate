@@ -81,8 +81,8 @@ export function preprocessCode(rawCode: string): string {
 
   let code = rawCode.trim();
 
-  // 1. Strip Markdown code fences if present
-  const fenceMatch = code.match(/^```(?:[a-zA-Z0-9_-]+)?\s*([\s\S]*?)\s*```$/);
+  // 1. Strip Markdown code fences if present (including fences surrounded by commentary)
+  const fenceMatch = code.match(/```(?:[a-zA-Z0-9_-]+)?\s*([\s\S]*?)\s*```/);
   if (fenceMatch) {
     code = fenceMatch[1].trim();
   }
@@ -182,6 +182,10 @@ function findCallableFunction(
     if (typeof named === 'function') {
       return { fn: named };
     }
+    const modNamed = (context as any).module?.exports?.[entrypoint];
+    if (typeof modNamed === 'function') {
+      return { fn: modNamed };
+    }
     return { error: `Entrypoint function '${entrypoint}' not found in proposal solution` };
   }
 
@@ -197,6 +201,17 @@ function findCallableFunction(
   }
   if (modExports && typeof modExports.default === 'function') {
     return { fn: modExports.default };
+  }
+  if (modExports && typeof modExports === 'object') {
+    for (const name of ['solution', 'solve', 'solutionFn', 'main', 'handler']) {
+      if (typeof modExports[name] === 'function') {
+        return { fn: modExports[name] };
+      }
+    }
+    const funcs = Object.values(modExports).filter((v) => typeof v === 'function');
+    if (funcs.length === 1) {
+      return { fn: funcs[0] as Function };
+    }
   }
 
   // 4. Conventional function names for algorithm solutions
@@ -562,7 +577,17 @@ export async function executeInSandbox(
     typeof (rawOutput as any).then === 'function'
   ) {
     const elapsed = performance.now() - startTime;
-    const remainingTimeout = Math.max(0, timeoutMs - elapsed);
+    const remainingTimeout = timeoutMs - elapsed;
+
+    if (remainingTimeout <= 0) {
+      const totalElapsed = Math.round(elapsed * 100) / 100;
+      return createFailureResult(
+        `Script execution timed out after ${timeoutMs}ms`,
+        expectedOutput,
+        totalElapsed,
+        true
+      );
+    }
 
     let timer: NodeJS.Timeout | undefined;
     try {

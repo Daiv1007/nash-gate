@@ -9,7 +9,9 @@ import { createAgent, type Agent } from './core/index.ts';
 import {
   MockAdapter,
   OpenAICompatibleAdapter,
+  createAgentAdapter,
   resolveDefaultModel,
+  normalizeModelName,
   isLiveMode,
   type AgentAdapter,
   type ProblemContext,
@@ -96,16 +98,61 @@ ${c.cyan}╔══════════════════════�
 ╚═══════════════════════════════════════════════════════════════════════════════╝${c.reset}
 `);
 
+  // CLI Argument Helpers
+  function getCliArg(prefix: string): string | undefined {
+    return process.argv
+      .find((a) => a.startsWith(prefix))
+      ?.slice(prefix.length)
+      ?.trim();
+  }
+
+  // Display Help Banner if requested
+  if (process.argv.includes('--help') || process.argv.includes('-h')) {
+    console.log(`
+${c.bold}USAGE:${c.reset}
+  npm run demo [options]
+
+${c.bold}OPTIONS:${c.reset}
+  --model=<name>             Set model for all agents (e.g. --model=gemini-3.8-flash, gpt-4o, llama3.2)
+  --alpha-model=<name>       Custom model for AlphaGen (Generator)
+  --buggy-model=<name>       Custom model for BuggyGen (Generator)
+  --sharp-model=<name>       Custom model for SharpAuditor (Auditor)
+  --reckless-model=<name>    Custom model for RecklessAuditor (Auditor)
+  --alpha-key=<key>          Custom API key for AlphaGen
+  --sharp-key=<key>          Custom API key for SharpAuditor
+  -h, --help                 Display this help reference
+
+${c.bold}SUPPORTED PROVIDERS & EXAMPLES:${c.reset}
+  ${c.cyan}Google Gemini:${c.reset}   npm run demo -- --model=gemini-3.8-flash
+  ${c.green}OpenAI:${c.reset}          npm run demo -- --model=gpt-4o-mini
+  ${c.magenta}Local Ollama:${c.reset}    npm run demo -- --model=llama3.2
+  ${c.yellow}Mixed Tourney:${c.reset}   npm run demo -- --alpha-model=gpt-4o --sharp-model=gemini-3.8-flash
+`);
+    process.exit(0);
+  }
+
+  // Support CLI arguments
+  const argModel = getCliArg('--model=');
+  const alphaModelArg = getCliArg('--alpha-model=');
+  const buggyModelArg = getCliArg('--buggy-model=');
+  const sharpModelArg = getCliArg('--sharp-model=');
+  const recklessModelArg = getCliArg('--reckless-model=');
+  const alphaKeyArg = getCliArg('--alpha-key=');
+  const buggyKeyArg = getCliArg('--buggy-key=');
+  const sharpKeyArg = getCliArg('--sharp-key=');
+  const recklessKeyArg = getCliArg('--reckless-key=');
+
   // Detect Adapter Configuration
-  const isLive = isLiveMode();
-  const liveModel = resolveDefaultModel();
-  let adapter: AgentAdapter;
+  const isLive = isLiveMode() || Boolean(
+    argModel || alphaModelArg || buggyModelArg || sharpModelArg || recklessModelArg ||
+    alphaKeyArg || buggyKeyArg || sharpKeyArg || recklessKeyArg
+  );
+  const liveModel = normalizeModelName(argModel || resolveDefaultModel());
 
   if (isLive) {
     console.log(
-      `${c.green}⚡ Adapter:${c.reset} ${c.bold}OpenAICompatibleAdapter${c.reset} (Model: ${c.cyan}${liveModel}${c.reset})`
+      `${c.green}⚡ Multi-Agent Adapter:${c.reset} ${c.bold}Dynamic OpenAICompatibleAdapter Dispatcher${c.reset} (Default Model: ${c.cyan}${liveModel}${c.reset})`
     );
-    adapter = new OpenAICompatibleAdapter({ model: liveModel });
   } else {
     console.log(
       `${c.magenta}⚡ Adapter:${c.reset} ${c.bold}MockAdapter${c.reset} (Deterministic Offline Mode - Zero API keys required)`
@@ -113,7 +160,6 @@ ${c.cyan}╔══════════════════════�
     console.log(
       `${c.gray}   Tip: Set process.env.LLM_API_KEY (for Gemini/OpenAI) or process.env.LLM_BASE_URL (for Ollama) to test against live endpoints.${c.reset}\n`
     );
-    adapter = new MockAdapter();
   }
 
   // 4 Participating Agents
@@ -121,26 +167,30 @@ ${c.cyan}╔══════════════════════�
     createAgent({
       id: 'AlphaGen',
       role: 'GENERATOR',
-      model: isLive ? liveModel : 'deterministic-solid',
+      model: isLive ? normalizeModelName(alphaModelArg || liveModel) : 'deterministic-solid',
       capital: 100,
+      apiKey: alphaKeyArg,
     }),
     createAgent({
       id: 'BuggyGen',
       role: 'GENERATOR',
-      model: isLive ? liveModel : 'heuristic-naive',
+      model: isLive ? normalizeModelName(buggyModelArg || liveModel) : 'heuristic-naive',
       capital: 100,
+      apiKey: buggyKeyArg,
     }),
     createAgent({
       id: 'SharpAuditor',
       role: 'AUDITOR',
-      model: isLive ? liveModel : 'adversarial-verifier',
+      model: isLive ? normalizeModelName(sharpModelArg || liveModel) : 'adversarial-verifier',
       capital: 100,
+      apiKey: sharpKeyArg,
     }),
     createAgent({
       id: 'RecklessAuditor',
       role: 'AUDITOR',
-      model: isLive ? liveModel : 'speculative-challenger',
+      model: isLive ? normalizeModelName(recklessModelArg || liveModel) : 'speculative-challenger',
       capital: 100,
+      apiKey: recklessKeyArg,
     }),
   ];
 
@@ -161,7 +211,7 @@ ${c.cyan}╔══════════════════════�
   const result = await runTournament({
     agents: initialAgents,
     problems: tournamentProblems,
-    adapter,
+    adapter: (agent: Agent) => createAgentAdapter(agent, { globalModel: liveModel }),
     hooks: {
       onRoundStart: (roundNumber, problem, activeAgents) => {
         console.log(`\n${c.cyan}╔═══════════════════════════════════════════════════════════════════════════════╗`);
