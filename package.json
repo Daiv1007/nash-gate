@@ -3,10 +3,23 @@
   "version": "0.1.0",
   "description": "Game-theoretic consensus gate for multi-agent AI systems",
   "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./core": "./src/core/index.ts",
+    "./oracle": "./src/oracle/index.ts",
+    "./adapters": "./src/adapters/index.ts",
+    "./engine": "./src/engine/index.ts",
+    "./server": "./src/server/dashboard.ts"
+  },
   "scripts": {
     "test": "node --test",
     "demo": "node --no-warnings src/demo.ts",
     "ui": "node --no-warnings src/server/dashboard.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Daiv1007/nash-gate.git"
   },
   "keywords": [
     "game-theory",
@@ -14,6 +27,9 @@
     "multi-agent",
     "arbitration"
   ],
-  "author": "",
-  "license": "Apache-2.0"
+  "author": "Iván Murguiondo Azpilicueta <ivandavidaras@gmail.com>",
+  "license": "AGPL-3.0-or-later",
+  "engines": {
+    "node": ">=22.0.0"
+  }
 }

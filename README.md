@@ -5,7 +5,7 @@
 ![NashGate Real-Time Consensus Dashboard](assets/nash-gate-demo.gif)
 
 [![Tests](https://img.shields.io/badge/tests-95%20passing-brightgreen.svg)](tests/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Dependencies](https://img.shields.io/badge/dependencies-zero-success.svg)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-black.svg)](package.json)
 
@@ -102,7 +102,7 @@ NashGate requires Node.js v22+ and has **zero external production dependencies**
 ### 1. Clone & Verify Tests
 
 ```bash
-git clone https://github.com/your-org/nash-gate.git
+git clone https://github.com/Daiv1007/nash-gate.git
 cd nash-gate
 npm test
 ```
@@ -236,4 +236,4 @@ nash-gate/
 
 ## 📄 License
 
-Apache-2.0 © NashGate Authors
+GNU Affero General Public License v3.0 (AGPL-3.0) © 2026 NashGate Authors
