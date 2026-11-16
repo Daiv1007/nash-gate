@@ -747,7 +747,7 @@ describe('DashboardServer & Web Visualizer', () => {
     assert.ok(body.includes('Access denied'));
   });
 
-  it('DashboardServer blocks SSRF attacks on /api/models/discover with 403 Forbidden', (t, done) => {
+  it('DashboardServer blocks SSRF attacks on /api/models/discover with 403 Forbidden', async () => {
     const server = new DashboardServer({ paceMs: 1 });
     let status = 0;
     let body = '';
@@ -756,17 +756,23 @@ describe('DashboardServer & Web Visualizer', () => {
     mockReq.method = 'POST';
     mockReq.headers = { host: 'localhost:3000' };
     const mockRes: any = new EventEmitter();
-    mockRes.writeHead = (c: number) => {
-      status = c;
-    };
-    mockRes.end = (content: string) => {
-      body = content;
-      assert.equal(status, 403);
-      assert.ok(body.includes('not permitted'));
-      done();
-    };
+
+    const endPromise = new Promise<void>((resolve) => {
+      mockRes.writeHead = (c: number) => {
+        status = c;
+      };
+      mockRes.end = (content: string) => {
+        body = content;
+        resolve();
+      };
+    });
+
     (server as any).handleRequest(mockReq, mockRes);
     mockReq.emit('data', JSON.stringify({ url: 'http://169.254.169.254/latest/meta-data/' }));
     mockReq.emit('end');
+
+    await endPromise;
+    assert.equal(status, 403);
+    assert.ok(body.includes('not permitted'));
   });
 });
