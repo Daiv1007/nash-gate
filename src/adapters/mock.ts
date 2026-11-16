@@ -8,6 +8,11 @@
 import type { Agent, Challenge, Proposal } from '../core/types.ts';
 import { MIN_STAKE } from '../core/types.ts';
 import { roundToPrecision } from '../core/bankruptcy.ts';
+import {
+  clampStake,
+  calculateGeneratorStake,
+  calculateAuditorStake,
+} from '../core/index.ts';
 import type {
   AgentAdapter,
   GenerateChallengeParams,
@@ -106,10 +111,10 @@ export const DEFAULT_MOCK_CATALOG: Record<
     },
     flawChallenge: {
       shouldChallenge: true,
-      testInput: [-10, 0, 100],
-      expectedOutput: 0,
+      testInput: [50, 100, 0],
+      expectedOutput: 50,
       defaultStakePercent: 0.4,
-      reasoning: 'Negative value below zero-bound must clamp to 0; triggers off-by-one or condition branch.',
+      reasoning: 'Inverted bounds (min=100 > max=0) where value 50 should clamp to 50; buggy naive branch returns min (100).',
     },
     falsePositiveChallenge: {
       shouldChallenge: true,
@@ -155,7 +160,350 @@ export const DEFAULT_MOCK_CATALOG: Record<
       reasoning: 'Standard positive array; generator passes.',
     },
   },
+  'is-valid-parentheses': {
+    solid: {
+      solution: `function isValidParentheses(s) {
+  const stack = [];
+  const map = { ')': '(', '}': '{', ']': '[' };
+  for (const ch of String(s)) {
+    if (ch === '(' || ch === '{' || ch === '[') {
+      stack.push(ch);
+    } else if (ch === ')' || ch === '}' || ch === ']') {
+      if (stack.pop() !== map[ch]) return false;
+    }
+  }
+  return stack.length === 0;
+}`,
+      defaultStakePercent: 0.35,
+      reasoning: 'LIFO stack verification ensures proper nesting and closing order for brackets.',
+    },
+    buggy: {
+      solution: `function isValidParentheses(s) {
+  // Naive counter heuristic: fails on interleaved brackets like '([)]'
+  let round = 0, curly = 0, square = 0;
+  for (const ch of String(s)) {
+    if (ch === '(') round++;
+    else if (ch === ')') round--;
+    else if (ch === '{') curly++;
+    else if (ch === '}') curly--;
+    else if (ch === '[') square++;
+    else if (ch === ']') square--;
+    if (round < 0 || curly < 0 || square < 0) return false;
+  }
+  return round === 0 && curly === 0 && square === 0;
+}`,
+      defaultStakePercent: 0.45,
+      reasoning: 'Independent bracket counters verify overall balance without stack overhead.',
+    },
+    flawChallenge: {
+      shouldChallenge: true,
+      testInput: '([)]',
+      expectedOutput: false,
+      defaultStakePercent: 0.4,
+      reasoning: 'Interleaved bracket sequences balance counters but violate proper nesting order.',
+    },
+    falsePositiveChallenge: {
+      shouldChallenge: true,
+      testInput: '{[()]}',
+      expectedOutput: true,
+      defaultStakePercent: 0.25,
+      reasoning: 'Symmetric well-nested bracket structure; generator will pass cleanly.',
+    },
+  },
+  'two-sum': {
+    solid: {
+      solution: `function twoSum(nums, target) {
+  const seen = new Map();
+  for (let i = 0; i < nums.length; i++) {
+    const comp = target - nums[i];
+    if (seen.has(comp)) return [seen.get(comp), i];
+    seen.set(nums[i], i);
+  }
+  return null;
+}`,
+      defaultStakePercent: 0.35,
+      reasoning: 'Single-pass hash map complement matching with strict distinct index guarantee.',
+    },
+    buggy: {
+      solution: `function twoSum(nums, target) {
+  // Buggy: compares elements without checking i !== j, reusing the same element
+  for (let i = 0; i < nums.length; i++) {
+    for (let j = 0; j < nums.length; j++) {
+      if (nums[i] + nums[j] === target) return [i, j];
+    }
+  }
+  return null;
+}`,
+      defaultStakePercent: 0.5,
+      reasoning: 'Nested iteration over pairs to detect matching target sum.',
+    },
+    flawChallenge: {
+      shouldChallenge: true,
+      testInput: [[3, 2, 4], 6],
+      expectedOutput: [1, 2],
+      defaultStakePercent: 0.4,
+      reasoning: 'Target 6 with element 3 at index 0 tricks buggy double-loop into returning [0, 0] instead of [1, 2].',
+    },
+    falsePositiveChallenge: {
+      shouldChallenge: true,
+      testInput: [[2, 7, 11, 15], 9],
+      expectedOutput: [0, 1],
+      defaultStakePercent: 0.3,
+      reasoning: 'Distinct elements at index 0 and 1; generator passes effortlessly.',
+    },
+  },
+  'flatten-array': {
+    solid: {
+      solution: `function flattenArray(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.reduce((acc, item) => {
+    return acc.concat(Array.isArray(item) ? flattenArray(item) : item);
+  }, []);
+}`,
+      defaultStakePercent: 0.3,
+      reasoning: 'Recursive reduction gracefully flattens arbitrarily nested array trees.',
+    },
+    buggy: {
+      solution: `function flattenArray(arr) {
+  // Naive shallow flatten: only unpacks 1 level deep
+  if (!Array.isArray(arr)) return [];
+  return [].concat(...arr);
+}`,
+      defaultStakePercent: 0.45,
+      reasoning: 'Fast single-level spread concatenation heuristic.',
+    },
+    flawChallenge: {
+      shouldChallenge: true,
+      testInput: [1, [2, [3, [4]], 5]],
+      expectedOutput: [1, 2, 3, 4, 5],
+      defaultStakePercent: 0.4,
+      reasoning: 'Deeply nested arrays are not flattened beyond depth 1 by shallow spread.',
+    },
+    falsePositiveChallenge: {
+      shouldChallenge: true,
+      testInput: [1, [2, 3], 4],
+      expectedOutput: [1, 2, 3, 4],
+      defaultStakePercent: 0.25,
+      reasoning: 'Single-level nested array where shallow flatten happens to work.',
+    },
+  },
+  'fibonacci': {
+    solid: {
+      solution: `function fibonacci(n) {
+  const num = Math.floor(Number(n));
+  if (num <= 0) return 0;
+  if (num === 1) return 1;
+  let prev = 0, curr = 1;
+  for (let i = 2; i <= num; i++) {
+    const next = prev + curr;
+    prev = curr;
+    curr = next;
+  }
+  return curr;
+}`,
+      defaultStakePercent: 0.3,
+      reasoning: 'Iterative O(N) linear scan with proper 0-indexed base cases fib(0)=0, fib(1)=1.',
+    },
+    buggy: {
+      solution: `function fibonacci(n) {
+  // Buggy 1-indexed off-by-one: returns 1 for n=0
+  if (n <= 1) return 1;
+  return fibonacci(n - 1) + fibonacci(n - 2);
+}`,
+      defaultStakePercent: 0.5,
+      reasoning: 'Standard textbook recursive Fibonacci definition.',
+    },
+    flawChallenge: {
+      shouldChallenge: true,
+      testInput: 0,
+      expectedOutput: 0,
+      defaultStakePercent: 0.35,
+      reasoning: 'fib(0) must equal 0, but buggy recursion returns 1.',
+    },
+    falsePositiveChallenge: {
+      shouldChallenge: true,
+      testInput: 6,
+      expectedOutput: 8,
+      defaultStakePercent: 0.3,
+      reasoning: 'fib(6) evaluates to 8; generator passes.',
+    },
+  },
+  'anagram-check': {
+    solid: {
+      solution: `function isAnagram(s1, s2) {
+  const clean1 = String(s1).toLowerCase().replace(/[^a-z0-9]/g, '').split('').sort().join('');
+  const clean2 = String(s2).toLowerCase().replace(/[^a-z0-9]/g, '').split('').sort().join('');
+  return clean1 === clean2;
+}`,
+      defaultStakePercent: 0.3,
+      reasoning: 'Normalization, sorting, and comparison handles spacing, casing, and punctuation.',
+    },
+    buggy: {
+      solution: `function isAnagram(s1, s2) {
+  // Buggy: only checks string length and simple character existence without frequency count
+  if (s1.length !== s2.length) return false;
+  return [...s1].every(ch => s2.includes(ch));
+}`,
+      defaultStakePercent: 0.4,
+      reasoning: 'Fast character presence check assuming equal length implies anagram.',
+    },
+    flawChallenge: {
+      shouldChallenge: true,
+      testInput: ['Debit Card', 'Bad Credit'],
+      expectedOutput: true,
+      defaultStakePercent: 0.35,
+      reasoning: 'Mixed-case and spaces evaluate to anagram under normalization, but buggy solution fails.',
+    },
+    falsePositiveChallenge: {
+      shouldChallenge: true,
+      testInput: ['silent', 'listen'],
+      expectedOutput: true,
+      defaultStakePercent: 0.25,
+      reasoning: 'Valid lowercase single-word anagram; generator passes.',
+    },
+  },
+  'chunk-array': {
+    solid: {
+      solution: `function chunkArray(arr, size) {
+  if (!Array.isArray(arr) || size <= 0) return [];
+  const result = [];
+  for (let i = 0; i < arr.length; i += size) {
+    result.push(arr.slice(i, i + size));
+  }
+  return result;
+}`,
+      defaultStakePercent: 0.3,
+      reasoning: 'Sequential slicing cleanly handles uneven tail chunks and invalid size values.',
+    },
+    buggy: {
+      solution: `function chunkArray(arr, size) {
+  // Buggy: drops the remainder chunk when array length is not evenly divisible by size
+  if (!Array.isArray(arr) || size <= 0) return [];
+  const fullChunksCount = Math.floor(arr.length / size);
+  const result = [];
+  for (let i = 0; i < fullChunksCount; i++) {
+    result.push(arr.slice(i * size, (i + 1) * size));
+  }
+  return result;
+}`,
+      defaultStakePercent: 0.45,
+      reasoning: 'Symmetric chunk generation for exact divisor chunks.',
+    },
+    flawChallenge: {
+      shouldChallenge: true,
+      testInput: [[1, 2, 3, 4, 5], 2],
+      expectedOutput: [[1, 2], [3, 4], [5]],
+      defaultStakePercent: 0.35,
+      reasoning: 'Odd-length array leaves a trailing chunk [5] that buggy chunker drops.',
+    },
+    falsePositiveChallenge: {
+      shouldChallenge: true,
+      testInput: [[1, 2, 3, 4], 2],
+      expectedOutput: [[1, 2], [3, 4]],
+      defaultStakePercent: 0.25,
+      reasoning: 'Evenly divisible array where buggy chunker produces matching output.',
+    },
+  },
+  'find-duplicates': {
+    solid: {
+      solution: `function findDuplicates(numbers) {
+  if (!Array.isArray(numbers)) return [];
+  const seen = new Set();
+  const duplicates = new Set();
+  for (const num of numbers) {
+    if (seen.has(num)) duplicates.add(num);
+    else seen.add(num);
+  }
+  return Array.from(duplicates).sort((a, b) => a - b);
+}`,
+      defaultStakePercent: 0.35,
+      reasoning: 'Dual Set filtering guarantees O(N) duplicate detection with sorted, deduplicated output.',
+    },
+    buggy: {
+      solution: `function findDuplicates(numbers) {
+  // Buggy: returns duplicates multiple times if repeated >= 3 times, and unsorted
+  if (!Array.isArray(numbers)) return [];
+  return numbers.filter((val, idx) => numbers.indexOf(val) !== idx);
+}`,
+      defaultStakePercent: 0.4,
+      reasoning: 'Filter with indexOf check to capture repeated items.',
+    },
+    flawChallenge: {
+      shouldChallenge: true,
+      testInput: [4, 3, 2, 7, 8, 2, 3, 2],
+      expectedOutput: [2, 3],
+      defaultStakePercent: 0.35,
+      reasoning: 'Repeated items (2 repeated three times) require unique sorted output [2, 3]; buggy returns [2, 3, 2].',
+    },
+    falsePositiveChallenge: {
+      shouldChallenge: true,
+      testInput: [1, 2, 3],
+      expectedOutput: [],
+      defaultStakePercent: 0.25,
+      reasoning: 'Array with zero duplicates correctly yields empty array [].',
+    },
+  },
 };
+
+/**
+ * Registers custom mock problem definitions into the active mock catalog.
+ */
+export function registerMockProblem(
+  id: string,
+  mockDef: {
+    solid?: Partial<MockProposalDefinition>;
+    buggy?: Partial<MockProposalDefinition>;
+    flawChallenge?: Partial<MockChallengeDefinition>;
+    falsePositiveChallenge?: Partial<MockChallengeDefinition>;
+  }
+): void {
+  const normalizedId = id.toLowerCase().trim();
+  const fallback = DEFAULT_MOCK_CATALOG['is-palindrome'];
+  const existing = DEFAULT_MOCK_CATALOG[normalizedId] || fallback;
+
+  DEFAULT_MOCK_CATALOG[normalizedId] = {
+    solid: {
+      solution: mockDef.solid?.solution ?? existing.solid.solution,
+      defaultStakePercent: mockDef.solid?.defaultStakePercent ?? existing.solid.defaultStakePercent,
+      reasoning: mockDef.solid?.reasoning ?? existing.solid.reasoning,
+    },
+    buggy: {
+      solution: mockDef.buggy?.solution ?? existing.buggy.solution,
+      defaultStakePercent: mockDef.buggy?.defaultStakePercent ?? existing.buggy.defaultStakePercent,
+      reasoning: mockDef.buggy?.reasoning ?? existing.buggy.reasoning,
+    },
+    flawChallenge: {
+      shouldChallenge: mockDef.flawChallenge?.shouldChallenge ?? true,
+      testInput:
+        mockDef.flawChallenge?.testInput !== undefined
+          ? mockDef.flawChallenge.testInput
+          : existing.flawChallenge.testInput,
+      expectedOutput:
+        mockDef.flawChallenge?.expectedOutput !== undefined
+          ? mockDef.flawChallenge.expectedOutput
+          : existing.flawChallenge.expectedOutput,
+      defaultStakePercent:
+        mockDef.flawChallenge?.defaultStakePercent ?? existing.flawChallenge.defaultStakePercent,
+      reasoning: mockDef.flawChallenge?.reasoning ?? existing.flawChallenge.reasoning,
+    },
+    falsePositiveChallenge: {
+      shouldChallenge: mockDef.falsePositiveChallenge?.shouldChallenge ?? true,
+      testInput:
+        mockDef.falsePositiveChallenge?.testInput !== undefined
+          ? mockDef.falsePositiveChallenge.testInput
+          : existing.falsePositiveChallenge.testInput,
+      expectedOutput:
+        mockDef.falsePositiveChallenge?.expectedOutput !== undefined
+          ? mockDef.falsePositiveChallenge.expectedOutput
+          : existing.falsePositiveChallenge.expectedOutput,
+      defaultStakePercent:
+        mockDef.falsePositiveChallenge?.defaultStakePercent ??
+        existing.falsePositiveChallenge.defaultStakePercent,
+      reasoning:
+        mockDef.falsePositiveChallenge?.reasoning ?? existing.falsePositiveChallenge.reasoning,
+    },
+  };
+}
 
 /**
  * Configuration options for customizing MockAdapter behavior.
@@ -281,8 +629,20 @@ export class MockAdapter implements AgentAdapter {
     const useBuggy = this.isBuggyGenerator(agent);
     const def = useBuggy ? catalog.buggy : catalog.solid;
 
-    // Calculate stake as percentage of current capital
-    const calculatedStake = roundToPrecision(agent.capital * def.defaultStakePercent, 2);
+    // Game-theoretic dynamic staking calculation:
+    // If def.defaultStakePercent is defined, calculate baseline from it, clamped via clampStake.
+    // Otherwise calculate dynamically using calculateGeneratorStake.
+    let calculatedStake: number;
+    if (def.defaultStakePercent !== undefined) {
+      calculatedStake = roundToPrecision(agent.capital * def.defaultStakePercent, 2);
+    } else {
+      const decision = calculateGeneratorStake({
+        capital: agent.capital,
+        confidence: useBuggy ? 0.72 : 0.90,
+        riskProfile: useBuggy ? 'aggressive' : 'balanced',
+      });
+      calculatedStake = decision.stake;
+    }
     const stake = this.normalizeStake(calculatedStake, agent.capital);
 
     return {
@@ -323,10 +683,14 @@ export class MockAdapter implements AgentAdapter {
     // Case 1: Target is buggy and auditor is not passive -> Sharp audit catches flaw
     if (targetIsBuggy && !auditorIsPassive) {
       const def = catalog.flawChallenge;
-      const calculatedStake = roundToPrecision(
-        auditor.capital * (def.defaultStakePercent ?? 0.3),
-        2
-      );
+      const calculatedStake = def.defaultStakePercent !== undefined
+        ? roundToPrecision(auditor.capital * def.defaultStakePercent, 2)
+        : calculateAuditorStake({
+          capital: auditor.capital,
+          targetStake: proposal.stake,
+          confidence: 0.90,
+          riskProfile: 'balanced',
+        }).stake;
       const stake = this.normalizeStake(calculatedStake, auditor.capital);
       return {
         auditorId: auditor.id,
@@ -340,10 +704,14 @@ export class MockAdapter implements AgentAdapter {
     // Case 2: Target is solid, but auditor is reckless -> lodges false positive challenge
     if (!targetIsBuggy && auditorIsReckless) {
       const def = catalog.falsePositiveChallenge;
-      const calculatedStake = roundToPrecision(
-        auditor.capital * (def.defaultStakePercent ?? 0.25),
-        2
-      );
+      const calculatedStake = def.defaultStakePercent !== undefined
+        ? roundToPrecision(auditor.capital * def.defaultStakePercent, 2)
+        : calculateAuditorStake({
+          capital: auditor.capital,
+          targetStake: proposal.stake,
+          confidence: 0.75,
+          riskProfile: 'aggressive',
+        }).stake;
       const stake = this.normalizeStake(calculatedStake, auditor.capital);
       return {
         auditorId: auditor.id,
@@ -363,10 +731,6 @@ export class MockAdapter implements AgentAdapter {
    * Normalizes numeric stake within allowable bounds [MIN_STAKE, agentCapital].
    */
   private normalizeStake(rawStake: number, agentCapital: number): number {
-    if (agentCapital < MIN_STAKE) {
-      return MIN_STAKE;
-    }
-    const clamped = Math.max(MIN_STAKE, Math.min(rawStake, agentCapital));
-    return roundToPrecision(clamped, 2);
+    return clampStake(rawStake, agentCapital);
   }
 }

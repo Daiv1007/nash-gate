@@ -111,7 +111,10 @@ export function validateStake(stake: number, agentCapital: number): ValidationRe
     errors.push(`Stake (${stake}) must be at least MIN_STAKE (${MIN_STAKE}).`);
   }
 
-  if (stake > agentCapital) {
+  // Defend against sub-cent floating-point precision artifacts (e.g. 177.16 vs 177.156)
+  const roundedStake = Math.round((stake + Number.EPSILON) * 100) / 100;
+  const roundedCapital = Math.round((agentCapital + Number.EPSILON) * 100) / 100;
+  if (stake > agentCapital && roundedStake > roundedCapital) {
     errors.push(`Stake (${stake}) cannot exceed available agent capital (${agentCapital}).`);
   }
 

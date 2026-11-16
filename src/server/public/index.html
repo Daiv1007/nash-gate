@@ -1,35 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NashGate — Game-Theoretic Multi-Agent Consensus Visualizer</title>
   <style>
     :root {
-      --bg-base: #080b11;
-      --bg-surface: #0f1623;
-      --bg-card: #151e2e;
-      --bg-card-hover: #1b263b;
-      --border: #222f44;
-      --border-accent: #2e3e5c;
-      --text-main: #f1f5f9;
+      --bg-base: #070a11;
+      --bg-surface: #0e1524;
+      --bg-card: #141d30;
+      --bg-card-hover: #1a263e;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(255, 255, 255, 0.14);
+      --border-focus: rgba(6, 182, 212, 0.5);
+      --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --text-dim: #64748b;
-      
-      --cyan: #06b6d4;
-      --cyan-glow: rgba(6, 182, 212, 0.25);
-      --purple: #a855f7;
-      --purple-glow: rgba(168, 85, 247, 0.25);
-      --emerald: #10b981;
-      --emerald-glow: rgba(16, 185, 129, 0.25);
-      --rose: #f43f5e;
-      --rose-glow: rgba(244, 63, 94, 0.25);
-      --amber: #f59e0b;
-      --amber-glow: rgba(245, 158, 11, 0.25);
-      --blue: #3b82f6;
 
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      --font-mono: "Fira Code", "SF Mono", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+      --cyan: #06b6d4;
+      --cyan-bright: #22d3ee;
+      --cyan-glow: rgba(6, 182, 212, 0.28);
+      --purple: #a855f7;
+      --purple-bright: #c084fc;
+      --purple-glow: rgba(168, 85, 247, 0.28);
+      --emerald: #10b981;
+      --emerald-bright: #34d399;
+      --emerald-glow: rgba(16, 185, 129, 0.28);
+      --rose: #f43f5e;
+      --rose-bright: #fb7185;
+      --rose-glow: rgba(244, 63, 94, 0.28);
+      --amber: #f59e0b;
+      --amber-bright: #fbbf24;
+      --amber-glow: rgba(245, 158, 11, 0.28);
+      --blue: #3b82f6;
+      --blue-bright: #60a5fa;
+
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-full: 9999px;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+      --shadow-md: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+      --shadow-lg: 0 12px 36px -4px rgba(0, 0, 0, 0.7);
     }
 
     * {
@@ -40,28 +55,36 @@
 
     body {
       background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(circle at 12% 0%, rgba(6, 182, 212, 0.09) 0%, transparent 45%),
+        radial-gradient(circle at 88% 0%, rgba(168, 85, 247, 0.08) 0%, transparent 45%),
+        radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.5) 0%, transparent 100%);
       color: var(--text-main);
       font-family: var(--font-sans);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     /* Top Navigation Bar */
     header {
-      background: rgba(15, 22, 35, 0.9);
-      backdrop-filter: blur(12px);
+      background: rgba(8, 12, 22, 0.92);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
       border-bottom: 1px solid var(--border);
-      padding: 0.65rem 1.25rem;
+      padding: 0.85rem 2.25rem;
+      min-height: 80px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.75rem;
+      gap: 1.25rem;
       position: sticky;
       top: 0;
-      z-index: 50;
-      flex-wrap: wrap;
+      z-index: 100;
+      box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04), 0 4px 24px rgba(0, 0, 0, 0.45);
     }
 
     .brand {
@@ -69,70 +92,104 @@
       align-items: center;
       gap: 0.85rem;
       flex-shrink: 0;
+      user-select: none;
     }
 
     .brand-logo {
-      width: 34px;
-      height: 34px;
+      height: 48px;
+      padding: 0 18px;
       background: linear-gradient(135deg, var(--cyan), var(--purple));
-      border-radius: 8px;
+      border-radius: var(--radius-md);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 900;
-      font-size: 1.1rem;
-      color: #fff;
-      box-shadow: 0 0 16px var(--cyan-glow);
-    }
-
-    .brand-title {
+      font-weight: 800;
       font-size: 1.15rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
       color: #fff;
+      box-shadow: 0 0 20px var(--cyan-glow);
+      letter-spacing: 1.2px;
     }
 
-    .brand-subtitle {
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      font-family: var(--font-mono);
-      text-transform: uppercase;
-      letter-spacing: 1px;
+    .brand-logo-img {
+      height: 64px;
+      max-height: 68px;
+      width: auto;
+      max-width: 380px;
+      object-fit: contain;
+      flex-shrink: 0;
+      display: block;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), filter 0.25s ease;
+      filter: drop-shadow(0 2px 12px rgba(6, 182, 212, 0.3));
+    }
+
+    .brand-logo-img:hover {
+      transform: scale(1.03);
+      filter: drop-shadow(0 4px 18px rgba(6, 182, 212, 0.55));
     }
 
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.55rem;
       flex-wrap: wrap;
       justify-content: flex-end;
+    }
+
+    .header-divider {
+      width: 1px;
+      height: 24px;
+      background: rgba(255, 255, 255, 0.08);
+      margin: 0 0.15rem;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 1220px) {
+      header {
+        padding: 0.65rem 1.25rem;
+        gap: 0.75rem;
+      }
+
+      .header-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .header-divider {
+        display: none;
+      }
     }
 
     .header-btn-group {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.45rem;
       flex-shrink: 0;
     }
 
+    /* SSE Stream Live Status Badge */
     .stream-status {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 0.45rem;
-      font-size: 0.74rem;
+      gap: 0.5rem;
+      font-size: 0.76rem;
       font-family: var(--font-mono);
-      padding: 0.3rem 0.65rem;
-      border-radius: 9999px;
+      font-weight: 600;
+      height: 38px;
+      padding: 0 0.95rem;
+      border-radius: var(--radius-full);
       background: rgba(16, 185, 129, 0.1);
       border: 1px solid rgba(16, 185, 129, 0.3);
-      color: var(--emerald);
+      color: var(--emerald-bright);
       flex-shrink: 0;
+      letter-spacing: 0.4px;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.12);
     }
 
     .stream-status.offline {
       background: rgba(244, 63, 94, 0.1);
-      border-color: rgba(244, 63, 94, 0.3);
-      color: var(--rose);
+      border-color: rgba(244, 63, 94, 0.35);
+      color: var(--rose-bright);
+      box-shadow: 0 0 12px rgba(244, 63, 94, 0.12);
     }
 
     .status-dot {
@@ -140,271 +197,304 @@
       height: 8px;
       border-radius: 50%;
       background: currentColor;
-      box-shadow: 0 0 8px currentColor;
-      animation: pulse 2s infinite ease-in-out;
+      box-shadow: 0 0 10px currentColor;
+      animation: pulseGlow 2s infinite ease-in-out;
     }
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
+    @keyframes pulseGlow {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.4;
+        transform: scale(0.85);
+      }
     }
 
-    .engine-badge {
-      font-size: 0.72rem;
-      font-family: var(--font-mono);
-      padding: 0.3rem 0.55rem;
-      border-radius: 6px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    /* Interactive Model Picker */
-    .model-picker-wrap {
-      display: flex;
+    /* AI Providers Hub Pill */
+    .btn-providers-pill {
+      display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
-      background: var(--bg-card);
+      gap: 0.5rem;
+      height: 38px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-accent);
+      border-radius: var(--radius-md);
+      padding: 0 0.95rem;
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .btn-providers-pill:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--cyan);
+      box-shadow: 0 0 16px var(--cyan-glow);
+      transform: translateY(-1px);
+    }
+
+    .providers-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.12rem 0.55rem;
+      border-radius: var(--radius-full);
+      font-size: 0.68rem;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .providers-badge.active {
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--cyan-bright);
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      box-shadow: 0 0 10px rgba(6, 182, 212, 0.25);
+    }
+
+    /* Model / Rounds Picker Wrappers */
+    .model-picker-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      height: 38px;
+      background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.25rem 0.55rem;
+      border-radius: var(--radius-md);
+      padding: 0 0.75rem;
       flex-shrink: 0;
+      transition: all 0.2s ease;
+    }
+
+    .model-picker-wrap:hover {
+      border-color: var(--border-accent);
+      background: rgba(255, 255, 255, 0.06);
     }
 
     .model-picker-label {
-      font-size: 0.7rem;
+      font-size: 0.68rem;
       font-family: var(--font-mono);
+      font-weight: 700;
       color: var(--text-dim);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.6px;
       white-space: nowrap;
     }
 
     .model-input {
-      background: rgba(0, 0, 0, 0.4);
-      border: 1px solid var(--border-accent);
-      border-radius: 6px;
+      background: transparent;
+      border: none;
       color: #fff;
       font-family: var(--font-mono);
-      font-size: 0.76rem;
-      padding: 0.28rem 0.5rem;
+      font-size: 0.78rem;
+      font-weight: 500;
       outline: none;
-      transition: all 0.2s ease;
-    }
-
-    .header-model-select {
-      width: 175px;
-      max-width: 100%;
       cursor: pointer;
     }
 
-    .model-input:focus {
-      border-color: var(--cyan);
-      box-shadow: 0 0 10px var(--cyan-glow);
+    .model-input option {
+      background: var(--bg-surface);
+      color: #fff;
     }
 
-    /* API Key Picker */
-    .apikey-picker-wrap {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-      background: var(--bg-card);
+    /* Small Toolbar Buttons (+ Problem, JSON, MD) */
+    .btn-tool-sm {
+      height: 38px;
+      background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.25rem 0.55rem;
-      position: relative;
-      flex-shrink: 0;
-    }
-
-    .apikey-picker-label {
-      font-size: 0.7rem;
-      font-family: var(--font-mono);
-      color: var(--text-dim);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      white-space: nowrap;
-    }
-
-    .apikey-input {
-      background: rgba(0, 0, 0, 0.4);
-      border: 1px solid var(--border-accent);
-      border-radius: 6px;
-      color: #fff;
-      font-family: var(--font-mono);
-      font-size: 0.76rem;
-      padding: 0.28rem 1.7rem 0.28rem 0.55rem;
-      width: 125px;
-      outline: none;
-      transition: all 0.2s ease;
-    }
-
-    .apikey-input:focus {
-      border-color: var(--amber, #f59e0b);
-      box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
-    }
-
-    .apikey-input::placeholder {
-      color: var(--text-dim);
-      opacity: 0.6;
-    }
-
-    .apikey-toggle {
-      position: absolute;
-      right: 0.85rem;
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--text-dim);
-      font-size: 0.8rem;
-      padding: 0;
-      line-height: 1;
-      transition: color 0.15s ease;
-    }
-
-    .apikey-toggle:hover {
       color: var(--text-muted);
-    }
-
-    .apikey-status {
-      position: absolute;
-      top: calc(100% + 4px);
-      left: 0;
-      right: 0;
-      font-size: 0.65rem;
+      border-radius: var(--radius-md);
+      padding: 0 0.85rem;
+      font-size: 0.76rem;
       font-family: var(--font-mono);
-      text-align: center;
-      border-radius: 4px;
-      padding: 2px 6px;
-      pointer-events: none;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
       white-space: nowrap;
     }
 
-    .apikey-status.set {
-      color: #10b981;
-    }
-
-    .apikey-status.env {
-      color: var(--text-dim);
-    }
-
-    .btn-start {
-      background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    .btn-tool-sm:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--cyan);
       color: #fff;
-      border: none;
-      border-radius: 8px;
-      padding: 0.45rem 1.1rem;
-      font-weight: 600;
-      font-size: 0.84rem;
-      cursor: pointer;
-      display: flex;
+      box-shadow: 0 0 14px var(--cyan-glow);
+      transform: translateY(-1px);
+    }
+
+    .btn-tool-sm:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .btn-tool-sm.reset:hover {
+      border-color: var(--rose);
+      color: var(--rose-bright);
+      background: rgba(244, 63, 94, 0.12);
+      box-shadow: 0 0 14px var(--rose-glow);
+    }
+
+    /* Engine Mode Badge */
+    .engine-badge {
+      font-size: 0.74rem;
+      font-family: var(--font-mono);
+      font-weight: 500;
+      height: 38px;
+      padding: 0 0.85rem;
+      border-radius: var(--radius-md);
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+      display: inline-flex;
       align-items: center;
       gap: 0.45rem;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 12px rgba(14, 165, 233, 0.3);
+    }
+
+    /* Tournament Action Buttons */
+    .btn-start {
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 50%, #4f46e5 100%);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: var(--radius-md);
+      height: 38px;
+      padding: 0 1.35rem;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 2px 16px rgba(37, 99, 235, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
       white-space: nowrap;
       flex-shrink: 0;
+      user-select: none;
+      letter-spacing: 0.2px;
     }
 
     .btn-start:hover:not(:disabled) {
       transform: translateY(-1px);
-      box-shadow: 0 4px 18px rgba(14, 165, 233, 0.45);
+      box-shadow: 0 4px 24px rgba(37, 99, 235, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    }
+
+    .btn-start:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    .btn-start.btn-stop {
+      background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important;
+      border-color: #f87171 !important;
+      box-shadow: 0 2px 18px rgba(239, 68, 68, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+    }
+
+    .btn-start.btn-stop:hover {
+      box-shadow: 0 4px 28px rgba(239, 68, 68, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
     }
 
     .btn-start:disabled {
-      opacity: 0.6;
+      opacity: 0.5;
       cursor: not-allowed;
       transform: none;
     }
 
     .btn-reset {
-      background: rgba(244, 63, 94, 0.15);
-      border: 1px solid rgba(244, 63, 94, 0.4);
+      background: rgba(244, 63, 94, 0.08);
+      border: 1px solid rgba(244, 63, 94, 0.28);
       color: #fda4af;
-      border-radius: 8px;
-      padding: 0.45rem 0.85rem;
+      border-radius: var(--radius-md);
+      height: 38px;
+      padding: 0 1rem;
       font-weight: 600;
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       cursor: pointer;
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
-      transition: all 0.2s ease;
+      justify-content: center;
+      gap: 0.45rem;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       white-space: nowrap;
       flex-shrink: 0;
+      user-select: none;
     }
 
     .btn-reset:hover {
-      background: rgba(244, 63, 94, 0.3);
-      border-color: #f43f5e;
+      background: rgba(244, 63, 94, 0.22);
+      border-color: rgba(244, 63, 94, 0.55);
       color: #fff;
       transform: translateY(-1px);
+      box-shadow: 0 2px 16px rgba(244, 63, 94, 0.35);
     }
 
-    /* Active Agent Thinking Pulse */
-    .event-card.thinking {
-      border-color: rgba(56, 189, 248, 0.4);
-      background: linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(99, 102, 241, 0.05));
-      animation: thinkingGlow 2.5s infinite ease-in-out;
+    .btn-reset:active {
+      transform: scale(0.98);
     }
 
-    @keyframes thinkingGlow {
-      0%, 100% {
-        box-shadow: 0 0 10px rgba(14, 165, 233, 0.15);
-        border-color: rgba(56, 189, 248, 0.3);
-      }
-      50% {
-        box-shadow: 0 0 20px rgba(14, 165, 233, 0.35);
-        border-color: rgba(56, 189, 248, 0.7);
-      }
-    }
-
-    .thinking-spinner {
-      display: inline-block;
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(56, 189, 248, 0.3);
-      border-top-color: #38bdf8;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* Layout Container */
+    /* Main Container */
     main {
       flex: 1;
-      max-width: 1540px;
+      max-width: 1600px;
       margin: 0 auto;
-      padding: 1.5rem;
+      padding: 1.5rem 2rem 3rem;
       width: 100%;
       display: flex;
       flex-direction: column;
       gap: 1.5rem;
     }
 
-    /* Metrics Summary Bar */
+    /* Top Metrics Overview Bar */
     .metrics-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-      gap: 1rem;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.15rem;
+      margin-bottom: 0.25rem;
+    }
+
+    @media (max-width: 1080px) {
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .metrics-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     .metric-card {
-      background: var(--bg-surface);
+      background: linear-gradient(180deg, rgba(19, 27, 45, 0.72) 0%, rgba(11, 16, 29, 0.9) 100%);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1rem 1.25rem;
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.45rem;
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
+      gap: 0.5rem;
       position: relative;
       overflow: hidden;
+      box-shadow: var(--shadow-md);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--border-accent);
+      box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.7);
     }
 
     .metric-card::before {
@@ -412,40 +502,224 @@
       position: absolute;
       top: 0;
       left: 0;
-      width: 4px;
-      height: 100%;
+      right: 0;
+      height: 2px;
       background: var(--border-accent);
+      opacity: 0.85;
     }
 
-    .metric-card.accent-cyan::before { background: var(--cyan); }
-    .metric-card.accent-purple::before { background: var(--purple); }
-    .metric-card.accent-emerald::before { background: var(--emerald); }
-    .metric-card.accent-amber::before { background: var(--amber); }
+    .metric-card.accent-cyan::before {
+      background: linear-gradient(90deg, var(--cyan) 0%, transparent 85%);
+    }
+    .metric-card.accent-cyan {
+      background-image: radial-gradient(circle at 92% 0%, rgba(6, 182, 212, 0.12), transparent 55%);
+    }
+
+    .metric-card.accent-emerald::before {
+      background: linear-gradient(90deg, var(--emerald) 0%, transparent 85%);
+    }
+    .metric-card.accent-emerald {
+      background-image: radial-gradient(circle at 92% 0%, rgba(16, 185, 129, 0.12), transparent 55%);
+    }
+
+    .metric-card.accent-purple::before {
+      background: linear-gradient(90deg, var(--purple) 0%, transparent 85%);
+    }
+    .metric-card.accent-purple {
+      background-image: radial-gradient(circle at 92% 0%, rgba(168, 85, 247, 0.12), transparent 55%);
+    }
+
+    .metric-card.accent-amber::before {
+      background: linear-gradient(90deg, var(--amber) 0%, transparent 85%);
+    }
+    .metric-card.accent-amber {
+      background-image: radial-gradient(circle at 92% 0%, rgba(245, 158, 11, 0.12), transparent 55%);
+    }
+
+    .metric-header {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .metric-icon {
+      font-size: 0.95rem;
+    }
 
     .metric-title {
       font-size: 0.72rem;
       font-family: var(--font-mono);
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.8px;
       color: var(--text-dim);
     }
 
-    .metric-value {
-      font-size: 1.45rem;
+    .metric-value-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 0.25rem;
+    }
+
+    .currency-prefix {
+      font-size: 1.25rem;
       font-weight: 700;
+      color: var(--purple-bright);
+      font-family: var(--font-mono);
+    }
+
+    .metric-value {
+      font-size: 1.85rem;
+      font-weight: 800;
       font-family: var(--font-mono);
       color: #fff;
+      letter-spacing: -0.5px;
+      line-height: 1.15;
     }
 
     .metric-sub {
-      font-size: 0.75rem;
+      font-size: 0.76rem;
       color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    /* Capital Trajectory Chart Panel */
+    .panel {
+      background: linear-gradient(180deg, rgba(17, 25, 42, 0.75) 0%, rgba(12, 18, 30, 0.9) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+    }
+
+    .chart-panel {
+      padding: 1.25rem 1.5rem;
+      background: linear-gradient(180deg, rgba(16, 23, 40, 0.75) 0%, rgba(9, 14, 26, 0.9) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 0.25rem;
+    }
+
+    .chart-panel::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--cyan) 0%, var(--purple) 50%, transparent 100%);
+      opacity: 0.8;
+    }
+
+    .chart-header-left {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .chart-round-tag {
+      background: rgba(6, 182, 212, 0.14);
+      color: var(--cyan-bright);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      font-size: 0.74rem;
+      padding: 0.2rem 0.55rem;
+      box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
+    }
+
+    .chart-legend {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+    }
+
+    .chart-legend-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.76rem;
+      font-family: var(--font-mono);
+      color: var(--text-main);
+      background: rgba(14, 21, 35, 0.85);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.25rem 0.55rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      transition: all 0.2s ease;
+    }
+
+    .chart-legend-pill:hover {
+      border-color: var(--border-accent);
+      transform: translateY(-1px);
+    }
+
+    .panel-header {
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.02);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .panel-title {
+      font-size: 0.84rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    /* SVG Chart */
+    .chart-svg-container {
+      position: relative;
+      width: 100%;
+      overflow: hidden;
+      border-radius: var(--radius-md);
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      padding: 0.5rem;
+    }
+
+    #capitalChartSvg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .chart-tooltip {
+      position: absolute;
+      pointer-events: none;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-accent);
+      border-radius: var(--radius-sm);
+      padding: 0.45rem 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: #fff;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+      transform: translate(-50%, -120%);
+      white-space: nowrap;
     }
 
     /* Split Dashboard Body */
     .dashboard-split {
       display: grid;
-      grid-template-columns: minmax(380px, 420px) 1fr;
+      grid-template-columns: minmax(380px, 440px) 1fr;
       gap: 1.5rem;
       align-items: start;
     }
@@ -456,70 +730,40 @@
       }
     }
 
-    /* Section Panels */
-    .panel {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .panel-header {
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid var(--border);
-      background: rgba(21, 30, 46, 0.4);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .panel-title {
-      font-size: 0.84rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.75px;
-      color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
     /* Agent Cards Container */
     .agents-list {
-      padding: 0.85rem;
+      padding: 1rem;
       display: flex;
       flex-direction: column;
-      gap: 0.85rem;
+      gap: 0.95rem;
     }
 
     .agent-card {
-      background: var(--bg-card);
+      background: linear-gradient(180deg, rgba(22, 31, 50, 0.75) 0%, rgba(15, 22, 36, 0.9) 100%);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 0.95rem;
+      border-radius: var(--radius-md);
+      padding: 1rem 1.15rem;
       display: flex;
       flex-direction: column;
-      gap: 0.65rem;
-      transition: all 0.3s ease;
+      gap: 0.75rem;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
       position: relative;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
     }
 
     .agent-card:hover {
-      border-color: var(--border-accent);
-      background: var(--bg-card-hover);
+      border-color: rgba(6, 182, 212, 0.4);
+      background: linear-gradient(180deg, rgba(26, 38, 62, 0.85) 0%, rgba(18, 27, 44, 0.95) 100%);
+      box-shadow: 0 8px 28px -4px rgba(0, 0, 0, 0.6), 0 0 16px rgba(6, 182, 212, 0.1);
+      transform: translateY(-1px);
     }
 
     .agent-card.bankrupt {
       border-color: rgba(244, 63, 94, 0.4);
       background: rgba(244, 63, 94, 0.05);
-      opacity: 0.8;
+      opacity: 0.75;
     }
 
-    /* Tier 1: Agent Header Row */
     .agent-card-header {
       display: flex;
       align-items: center;
@@ -530,42 +774,42 @@
     .agent-title-row {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.5rem;
       min-width: 0;
     }
 
     .agent-id {
       font-weight: 700;
-      font-size: 1rem;
+      font-size: 1.05rem;
       color: #fff;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      letter-spacing: -0.2px;
     }
 
     .agent-status-badges {
       display: flex;
       align-items: center;
-      gap: 0.35rem;
+      gap: 0.4rem;
       flex-shrink: 0;
     }
 
-    /* Tier 2: Agent Controls Row */
     .agent-card-controls {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
-      background: rgba(0, 0, 0, 0.25);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 6px;
-      padding: 0.3rem 0.5rem;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-sm);
+      padding: 0.35rem 0.6rem;
     }
 
     .agent-model-select-wrap {
       display: flex;
       align-items: center;
-      gap: 0.35rem;
+      gap: 0.4rem;
       flex: 1;
       min-width: 0;
     }
@@ -573,6 +817,7 @@
     .agent-model-label {
       font-size: 0.65rem;
       font-family: var(--font-mono);
+      font-weight: 600;
       color: var(--text-dim);
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -582,7 +827,7 @@
     .agent-model-select {
       flex: 1;
       min-width: 0;
-      font-size: 0.74rem;
+      font-size: 0.76rem;
       font-family: var(--font-mono);
       color: var(--text-main);
       background: transparent;
@@ -604,41 +849,87 @@
       font-weight: 700;
       font-family: var(--font-mono);
       text-transform: uppercase;
-      padding: 0.18rem 0.45rem;
-      border-radius: 4px;
+      padding: 0.2rem 0.55rem;
+      border-radius: var(--radius-sm);
       letter-spacing: 0.4px;
       white-space: nowrap;
     }
 
     .badge-generator {
-      background: rgba(6, 182, 212, 0.15);
-      border: 1px solid rgba(6, 182, 212, 0.3);
-      color: var(--cyan);
+      background: rgba(6, 182, 212, 0.12);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      color: var(--cyan-bright);
     }
 
     .badge-auditor {
-      background: rgba(168, 85, 247, 0.15);
-      border: 1px solid rgba(168, 85, 247, 0.3);
-      color: var(--purple);
+      background: rgba(168, 85, 247, 0.12);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      color: var(--purple-bright);
     }
 
     .badge-active {
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      color: var(--emerald);
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: var(--emerald-bright);
     }
 
     .badge-bankrupt {
-      background: rgba(244, 63, 94, 0.15);
-      border: 1px solid rgba(244, 63, 94, 0.4);
-      color: var(--rose);
-      animation: pulse 1.5s infinite ease;
+      background: rgba(244, 63, 94, 0.18);
+      border: 1px solid rgba(244, 63, 94, 0.5);
+      color: var(--rose-bright);
+      animation: pulseGlow 1.5s infinite ease;
+    }
+
+    .badge-role-toggle {
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .badge-role-toggle:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 10px currentColor;
+    }
+
+    .badge-key {
+      font-size: 0.66rem;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      padding: 0.22rem 0.55rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      transition: all 0.2s ease;
+      user-select: none;
+      white-space: nowrap;
+      flex-shrink: 0;
+      border: none;
+    }
+
+    .badge-key-active {
+      background: rgba(245, 158, 11, 0.16);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: var(--amber-bright);
+    }
+
+    .badge-key-none {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      color: var(--text-dim);
+    }
+
+    .badge-key-none:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: rgba(6, 182, 212, 0.08);
     }
 
     .capital-section {
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
+      gap: 0.4rem;
     }
 
     .capital-row {
@@ -650,8 +941,10 @@
     .capital-label {
       font-size: 0.72rem;
       font-family: var(--font-mono);
+      font-weight: 500;
       color: var(--text-dim);
       text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .capital-value-wrap {
@@ -661,19 +954,20 @@
     }
 
     .capital-value {
-      font-size: 1.35rem;
-      font-weight: 700;
+      font-size: 1.45rem;
+      font-weight: 800;
       font-family: var(--font-mono);
       color: #fff;
+      letter-spacing: -0.5px;
     }
 
     .delta-indicator {
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       font-family: var(--font-mono);
       font-weight: 700;
       opacity: 0;
       transform: translateY(4px);
-      transition: all 0.4s ease;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .delta-indicator.visible {
@@ -681,33 +975,41 @@
       transform: translateY(0);
     }
 
-    .delta-indicator.positive { color: var(--emerald); }
-    .delta-indicator.negative { color: var(--rose); }
+    .delta-indicator.positive {
+      color: var(--emerald-bright);
+    }
 
-    /* Animated Capital Bar */
+    .delta-indicator.negative {
+      color: var(--rose-bright);
+    }
+
     .bar-track {
       width: 100%;
-      height: 7px;
-      background: rgba(34, 47, 68, 0.5);
-      border-radius: 9999px;
+      height: 8px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: var(--radius-full);
       overflow: hidden;
       position: relative;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
     }
 
     .bar-fill {
       height: 100%;
       width: 50%;
-      border-radius: 9999px;
-      transition: width 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.4s ease;
+      border-radius: var(--radius-full);
+      transition: width 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.4s ease;
       background: linear-gradient(90deg, var(--cyan), #38bdf8);
+      box-shadow: 0 0 10px rgba(6, 182, 212, 0.4);
     }
 
     .bar-fill.auditor {
       background: linear-gradient(90deg, var(--purple), #c084fc);
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
     }
 
     .bar-fill.profit {
       background: linear-gradient(90deg, var(--emerald), #34d399);
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
     }
 
     .bar-fill.bankrupt {
@@ -721,31 +1023,34 @@
       justify-content: space-between;
       font-size: 0.75rem;
       color: var(--text-dim);
-      padding-top: 0.35rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.04);
+      padding-top: 0.4rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
     }
 
     .roi-badge {
       font-family: var(--font-mono);
-      font-weight: 600;
-      padding: 0.15rem 0.45rem;
-      border-radius: 4px;
+      font-weight: 700;
+      padding: 0.18rem 0.55rem;
+      border-radius: var(--radius-sm);
       font-size: 0.72rem;
     }
 
     .roi-positive {
-      color: var(--emerald);
-      background: rgba(16, 185, 129, 0.1);
+      color: var(--emerald-bright);
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
     }
 
     .roi-negative {
-      color: var(--rose);
-      background: rgba(244, 63, 94, 0.1);
+      color: var(--rose-bright);
+      background: rgba(244, 63, 94, 0.12);
+      border: 1px solid rgba(244, 63, 94, 0.3);
     }
 
     .roi-neutral {
       color: var(--text-dim);
       background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     /* Live Feed Panel */
@@ -753,17 +1058,19 @@
       display: flex;
       flex-direction: column;
       height: calc(100vh - 270px);
-      min-height: 520px;
+      min-height: 540px;
     }
 
-    /* Current Round Problem Banner */
     .problem-banner {
-      background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(168, 85, 247, 0.08));
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 1.25rem;
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%);
+      border: 1px solid rgba(6, 182, 212, 0.25);
+      border-radius: var(--radius-md);
+      margin: 1rem 1.25rem 0.5rem;
+      padding: 1.15rem 1.35rem;
       display: flex;
       flex-direction: column;
-      gap: 0.4rem;
+      gap: 0.5rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
     }
 
     .problem-top {
@@ -775,38 +1082,38 @@
     .problem-round {
       font-size: 0.75rem;
       font-family: var(--font-mono);
-      font-weight: 700;
-      color: var(--cyan);
+      font-weight: 800;
+      color: var(--cyan-bright);
       text-transform: uppercase;
-      letter-spacing: 0.75px;
+      letter-spacing: 0.8px;
     }
 
     .problem-entrypoint {
       font-size: 0.75rem;
       font-family: var(--font-mono);
-      color: var(--text-muted);
-      background: rgba(0, 0, 0, 0.3);
-      padding: 0.15rem 0.5rem;
-      border-radius: 4px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #e2e8f0;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 0.2rem 0.65rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     .problem-title {
-      font-size: 1.05rem;
+      font-size: 1.15rem;
       font-weight: 700;
       color: #fff;
+      letter-spacing: -0.2px;
     }
 
     .problem-task {
-      font-size: 0.84rem;
-      color: var(--text-muted);
-      line-height: 1.4;
+      font-size: 0.86rem;
+      color: #cbd5e1;
+      line-height: 1.5;
     }
 
-    /* Feed Controls */
     .feed-toolbar {
-      padding: 0.5rem 1.25rem;
-      background: rgba(15, 22, 35, 0.6);
+      padding: 0.65rem 1.25rem;
+      background: rgba(0, 0, 0, 0.25);
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
@@ -817,12 +1124,13 @@
     .feed-count {
       color: var(--text-dim);
       font-family: var(--font-mono);
+      font-weight: 500;
     }
 
     .feed-tools {
       display: flex;
       align-items: center;
-      gap: 1rem;
+      gap: 1.25rem;
     }
 
     .toolbar-btn {
@@ -830,10 +1138,11 @@
       border: none;
       color: var(--text-muted);
       cursor: pointer;
-      font-size: 0.75rem;
+      font-size: 0.76rem;
       display: flex;
       align-items: center;
       gap: 0.35rem;
+      transition: color 0.15s ease;
     }
 
     .toolbar-btn:hover {
@@ -845,7 +1154,7 @@
       align-items: center;
       gap: 0.4rem;
       cursor: pointer;
-      color: var(--text-dim);
+      color: var(--text-muted);
     }
 
     .autoscroll-toggle input {
@@ -853,7 +1162,6 @@
       cursor: pointer;
     }
 
-    /* Scrollable Events Area */
     .events-scroll {
       flex: 1;
       overflow-y: auto;
@@ -873,20 +1181,30 @@
     }
 
     .events-scroll::-webkit-scrollbar-thumb {
-      background: var(--border);
+      background: rgba(255, 255, 255, 0.12);
       border-radius: 4px;
     }
 
-    /* Feed Event Cards */
+    .events-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    /* Event Cards */
     .event-card {
-      background: var(--bg-card);
+      background: rgba(14, 21, 35, 0.85);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1rem;
+      border-radius: var(--radius-md);
+      padding: 1.15rem;
       display: flex;
       flex-direction: column;
-      gap: 0.65rem;
-      animation: fadeInSlide 0.35s ease forwards;
+      gap: 0.75rem;
+      animation: fadeInSlide 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      transition: border-color 0.2s ease;
+    }
+
+    .event-card:hover {
+      border-color: rgba(255, 255, 255, 0.14);
     }
 
     @keyframes fadeInSlide {
@@ -910,8 +1228,8 @@
       font-size: 0.72rem;
       font-family: var(--font-mono);
       font-weight: 700;
-      padding: 0.2rem 0.55rem;
-      border-radius: 4px;
+      padding: 0.22rem 0.6rem;
+      border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
       gap: 0.4rem;
@@ -921,34 +1239,34 @@
 
     .event-badge-proposal {
       background: rgba(6, 182, 212, 0.15);
-      border: 1px solid rgba(6, 182, 212, 0.3);
-      color: var(--cyan);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      color: var(--cyan-bright);
     }
 
     .event-badge-challenge {
       background: rgba(168, 85, 247, 0.15);
-      border: 1px solid rgba(168, 85, 247, 0.3);
-      color: var(--purple);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      color: var(--purple-bright);
     }
 
     .event-badge-pass {
       background: rgba(16, 185, 129, 0.15);
-      border: 1px solid rgba(16, 185, 129, 0.35);
-      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: var(--emerald-bright);
       box-shadow: 0 0 12px var(--emerald-glow);
     }
 
     .event-badge-fail {
       background: rgba(244, 63, 94, 0.15);
-      border: 1px solid rgba(244, 63, 94, 0.4);
-      color: var(--rose);
+      border: 1px solid rgba(244, 63, 94, 0.45);
+      color: var(--rose-bright);
       box-shadow: 0 0 12px var(--rose-glow);
     }
 
     .event-badge-settlement {
       background: rgba(59, 130, 246, 0.15);
-      border: 1px solid rgba(59, 130, 246, 0.3);
-      color: var(--blue);
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      color: var(--blue-bright);
     }
 
     .event-badge-bankruptcy {
@@ -964,122 +1282,25 @@
     }
 
     .event-content {
-      font-size: 0.85rem;
-      line-height: 1.45;
+      font-size: 0.86rem;
+      line-height: 1.5;
       color: var(--text-main);
     }
 
-    /* Code Snippet Box */
     .code-box {
-      background: #090d15;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 0.75rem 1rem;
+      background: #060911;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-md);
+      padding: 0.85rem 1.15rem;
       font-family: var(--font-mono);
-      font-size: 0.78rem;
+      font-size: 0.82rem;
       color: #e2e8f0;
       white-space: pre-wrap;
       word-break: break-all;
       overflow-x: auto;
-      max-height: 220px;
-      line-height: 1.4;
+      max-height: 240px;
+      line-height: 1.5;
       position: relative;
-    }
-
-    /* Test Case Display */
-    .io-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
-    }
-
-    @media (max-width: 640px) {
-      .io-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .io-card {
-      background: #090d15;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 0.6rem 0.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-
-    .io-label {
-      font-size: 0.68rem;
-      font-family: var(--font-mono);
-      text-transform: uppercase;
-      color: var(--text-dim);
-    }
-
-    .io-value {
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      color: #cbd5e1;
-      word-break: break-all;
-    }
-
-    /* Capital Transfer Logs */
-    .transfers-box {
-      background: #0a0f1a;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 0.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .transfer-line {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 0.82rem;
-      font-family: var(--font-mono);
-      padding: 0.35rem 0.5rem;
-      border-radius: 4px;
-    }
-
-    .transfer-line.bounty {
-      background: rgba(16, 185, 129, 0.08);
-      border-left: 3px solid var(--emerald);
-    }
-
-    .transfer-line.penalty {
-      background: rgba(244, 63, 94, 0.08);
-      border-left: 3px solid var(--rose);
-    }
-
-    .transfer-line.dividend {
-      background: rgba(59, 130, 246, 0.08);
-      border-left: 3px solid var(--blue);
-    }
-
-    /* Leaderboard Podium */
-    .leaderboard-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.82rem;
-      font-family: var(--font-mono);
-      margin-top: 0.5rem;
-    }
-
-    .leaderboard-table th {
-      text-align: left;
-      padding: 0.5rem;
-      color: var(--text-dim);
-      border-bottom: 1px solid var(--border);
-      text-transform: uppercase;
-      font-size: 0.7rem;
-    }
-
-    .leaderboard-table td {
-      padding: 0.6rem 0.5rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
     }
 
     .empty-state {
@@ -1087,126 +1308,33 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 4rem 2rem;
+      padding: 4.5rem 2rem;
       color: var(--text-dim);
       text-align: center;
-      gap: 0.75rem;
+      gap: 0.85rem;
     }
 
     .empty-icon {
-      font-size: 2.2rem;
-      opacity: 0.6;
-    }
-
-    .spinner {
-      display: inline-block;
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 50%;
-      border-top-color: #fff;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* Agent Management Toolbar & Buttons */
-    .btn-tool-sm {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-      border-radius: 6px;
-      padding: 0.25rem 0.6rem;
-      font-size: 0.72rem;
-      font-family: var(--font-mono);
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-      transition: all 0.2s ease;
-    }
-
-    .btn-tool-sm:hover {
-      border-color: var(--cyan);
-      color: #fff;
-      background: rgba(6, 182, 212, 0.1);
-    }
-
-    .btn-tool-sm.reset:hover {
-      border-color: var(--rose);
-      color: var(--rose);
-      background: rgba(244, 63, 94, 0.1);
-    }
-
-    .agent-header-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
+      font-size: 2.5rem;
+      opacity: 0.7;
+      animation: pulseGlow 3s infinite ease-in-out;
     }
 
     .btn-del-agent {
       background: none;
       border: none;
       color: var(--text-dim);
-      font-size: 0.85rem;
+      font-size: 0.9rem;
       cursor: pointer;
       padding: 0.2rem 0.35rem;
-      border-radius: 4px;
+      border-radius: var(--radius-sm);
       line-height: 1;
       transition: all 0.15s ease;
     }
 
     .btn-del-agent:hover {
-      color: var(--rose);
+      color: var(--rose-bright);
       background: rgba(244, 63, 94, 0.15);
-    }
-
-    .badge-role-toggle {
-      cursor: pointer;
-      user-select: none;
-      transition: all 0.2s ease;
-    }
-
-    .badge-role-toggle:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 0 8px currentColor;
-    }
-
-    .badge-key {
-      font-size: 0.65rem;
-      font-family: var(--font-mono);
-      font-weight: 600;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      transition: all 0.2s ease;
-      user-select: none;
-      white-space: nowrap;
-      flex-shrink: 0;
-      background: none;
-      border: none;
-    }
-
-    .badge-key-active {
-      background: rgba(245, 158, 11, 0.15);
-      border: 1px solid rgba(245, 158, 11, 0.4);
-      color: var(--amber);
-    }
-
-    .badge-key-none {
-      background: rgba(148, 163, 184, 0.1);
-      border: 1px dashed var(--border);
-      color: var(--text-dim);
-    }
-
-    .badge-key-none:hover {
-      border-color: var(--cyan);
-      color: var(--cyan);
     }
 
     /* Modal System */
@@ -1216,15 +1344,16 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(8px);
+      background: rgba(3, 6, 12, 0.8);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 1000;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.25s ease;
+      transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .modal-overlay.open {
@@ -1233,24 +1362,30 @@
     }
 
     .modal-card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-accent);
-      border-radius: 12px;
-      padding: 1.5rem;
-      width: 520px;
-      max-width: min(520px, 94vw);
+      background: linear-gradient(180deg, #131b2e 0%, #0d1322 100%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 16px;
+      padding: 1.75rem;
+      width: 540px;
+      max-width: min(540px, 94vw);
       box-sizing: border-box;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 24px var(--cyan-glow);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85), 0 0 35px rgba(6, 182, 212, 0.12);
       display: flex;
       flex-direction: column;
-      gap: 1.15rem;
-      animation: modalScale 0.25s ease forwards;
+      gap: 1.25rem;
+      animation: modalScale 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
       overflow: hidden;
     }
 
     @keyframes modalScale {
-      from { transform: scale(0.92); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
+      from {
+        transform: scale(0.92);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
     }
 
     .modal-header {
@@ -1258,26 +1393,28 @@
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid var(--border);
-      padding-bottom: 0.75rem;
+      padding-bottom: 0.85rem;
     }
 
     .modal-title {
-      font-size: 1.05rem;
+      font-size: 1.15rem;
       font-weight: 700;
       color: #fff;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.55rem;
+      letter-spacing: -0.2px;
     }
 
     .modal-close {
       background: none;
       border: none;
       color: var(--text-dim);
-      font-size: 1.25rem;
+      font-size: 1.4rem;
       cursor: pointer;
       line-height: 1;
       padding: 0.2rem;
+      transition: color 0.15s ease;
     }
 
     .modal-close:hover {
@@ -1287,7 +1424,7 @@
     .form-group {
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
+      gap: 0.4rem;
       min-width: 0;
       width: 100%;
       box-sizing: border-box;
@@ -1296,19 +1433,21 @@
     .form-label {
       font-size: 0.72rem;
       font-family: var(--font-mono);
+      font-weight: 600;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
 
-    .form-input, .form-select {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 0.45rem 0.65rem;
+    .form-input,
+    .form-select {
+      background: rgba(8, 12, 22, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-sm);
+      padding: 0.55rem 0.85rem;
       color: #fff;
       font-family: var(--font-mono);
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       outline: none;
       transition: all 0.2s ease;
       width: 100%;
@@ -1317,23 +1456,18 @@
       text-overflow: ellipsis;
     }
 
-    .form-input:focus, .form-select:focus {
+    .form-input:focus,
+    .form-select:focus {
       border-color: var(--cyan);
-      box-shadow: 0 0 10px var(--cyan-glow);
+      box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2);
     }
 
     .form-row {
       display: grid;
       grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-      gap: 0.75rem;
+      gap: 0.85rem;
       width: 100%;
       box-sizing: border-box;
-    }
-
-    @media (max-width: 520px) {
-      .form-row {
-        grid-template-columns: 1fr;
-      }
     }
 
     .modal-actions {
@@ -1344,19 +1478,20 @@
     }
 
     .btn-secondary {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-accent);
       color: var(--text-muted);
-      padding: 0.45rem 1rem;
-      border-radius: 6px;
+      padding: 0.5rem 1.15rem;
+      border-radius: var(--radius-sm);
       font-family: var(--font-mono);
       font-size: 0.8rem;
+      font-weight: 500;
       cursor: pointer;
       transition: all 0.2s ease;
     }
 
     .btn-secondary:hover {
-      background: var(--border);
+      background: rgba(255, 255, 255, 0.1);
       color: #fff;
     }
 
@@ -1365,109 +1500,240 @@
       border: none;
       color: #fff;
       font-weight: 700;
-      padding: 0.45rem 1.25rem;
-      border-radius: 6px;
+      padding: 0.5rem 1.35rem;
+      border-radius: var(--radius-sm);
       font-family: var(--font-sans);
       font-size: 0.85rem;
       cursor: pointer;
-      box-shadow: 0 0 12px var(--cyan-glow);
-      transition: all 0.2s ease;
+      box-shadow: 0 2px 14px var(--cyan-glow);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .btn-primary:hover {
       transform: translateY(-1px);
-      box-shadow: 0 0 16px var(--cyan-glow);
+      box-shadow: 0 4px 20px var(--cyan-glow);
     }
+
+    /* Providers Modal Cards */
+    .providers-modal-card {
+      max-width: 600px;
+      width: 94%;
+    }
+
+    .providers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .provider-box {
+      background: rgba(18, 26, 44, 0.65);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 0.95rem 1.15rem;
+      transition: all 0.2s ease;
+    }
+
+    .provider-box.connected {
+      border-color: rgba(6, 182, 212, 0.5);
+      background: rgba(18, 26, 44, 0.85);
+      box-shadow: 0 0 16px rgba(6, 182, 212, 0.1);
+    }
+
+    .provider-box-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .provider-box-title {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .provider-icon {
+      font-size: 1.35rem;
+    }
+
+    .provider-hint {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      margin-top: 2px;
+    }
+
+    .provider-status-badge {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.18rem 0.6rem;
+      border-radius: var(--radius-full);
+      white-space: nowrap;
+    }
+
+    .provider-status-badge.status-connected {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--emerald-bright);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .provider-status-badge.status-disconnected {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .provider-status-badge.status-testing {
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--cyan-bright);
+      border: 1px solid rgba(6, 182, 212, 0.4);
+    }
+
+    .provider-input-row {
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }
+
+    .provider-input-row .form-input {
+      padding-right: 2.5rem;
+    }
+
+    .btn-eye {
+      position: absolute;
+      right: 6px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 4px 6px;
+      transition: color 0.15s ease;
+    }
+
+    .btn-eye:hover {
+      color: #fff;
+    }
+
+    .provider-feedback {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      margin-top: 0.35rem;
+      min-height: 1rem;
+    }
+
+    .provider-feedback.feedback-success {
+      color: var(--emerald-bright);
+    }
+
+    .provider-feedback.feedback-error {
+      color: var(--rose-bright);
+    }
+
+    .provider-feedback.feedback-warning {
+      color: var(--amber-bright);
+    }
+
+    optgroup {
+      background: #0d1326;
+      color: var(--cyan);
+      font-weight: 700;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+
+    optgroup option {
+      background: var(--bg-card);
+      color: #fff;
+      font-weight: 400;
+    }
+
   </style>
 </head>
+
 <body>
 
   <!-- Top Navigation Header -->
   <header>
     <div class="brand">
-      <div class="brand-logo">N</div>
-      <div>
-        <div class="brand-title">NASHGATE</div>
-        <div class="brand-subtitle">Game-Theoretic Multi-Agent Consensus Visualizer</div>
-      </div>
+      <img
+        src="/assets/logo_nash-gate.png"
+        alt="NashGate"
+        class="brand-logo-img"
+        onerror="this.src='/assets/logo_nash-gate.jpg'; this.onerror=function(){this.style.display='none'; document.getElementById('brandLogoFallback').style.display='flex';};"
+      />
+      <div id="brandLogoFallback" class="brand-logo" style="display:none;">NASHGATE</div>
     </div>
 
     <div class="header-actions">
-      <div id="streamStatus" class="stream-status">
+      <!-- Live SSE Connection Badge -->
+      <div id="streamStatus" class="stream-status" title="Server-Sent Events connection status">
         <span class="status-dot"></span>
-        <span id="streamStatusText">SSE Stream Live</span>
+        <span id="streamStatusText">Live</span>
       </div>
 
-      <div class="apikey-picker-wrap" title="Paste your API key — stored only for this browser session, sent only to your local NashGate server">
-        <label for="apikeyInput" class="apikey-picker-label">API Key:</label>
-        <input
-          id="apikeyInput"
-          class="apikey-input"
-          type="password"
-          placeholder="Paste key here…"
-          autocomplete="off"
-          spellcheck="false"
-          oninput="onApiKeyChange(this.value)"
-        />
-        <button class="apikey-toggle" type="button" onclick="toggleApiKeyVisibility()" title="Show / hide key">👁</button>
-        <span id="apikeyStatus" class="apikey-status"></span>
+      <!-- Engine / Adapter Info Badge -->
+      <div id="engineModeBadge" class="engine-badge" title="Active model execution adapter">
+        ⚡ Loading...
       </div>
 
-      <div class="model-picker-wrap" title="Select LLM model for the consensus agents">
-        <label for="modelSelect" class="model-picker-label">Model:</label>
-        <select
-          id="modelSelect"
-          class="model-input header-model-select"
-          onchange="onModelSelectChange(this.value)"
-        >
-          <optgroup label="Google Gemini Models (Active AI Studio API)">
-            <option value="gemini-3.5-flash-lite" selected>Gemini 3.5 Flash-Lite (Recommended: Fast & High Quota)</option>
-            <option value="gemini-1.5-flash">Gemini 1.5 Flash (1,500 req/day quota)</option>
-            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-            <option value="gemini-3.8-flash">Gemini 3.8 Flash (20 req/day Free Tier cap)</option>
-          </optgroup>
-          <optgroup label="OpenAI Models">
-            <option value="gpt-4o-mini">OpenAI GPT-4o Mini</option>
-            <option value="gpt-4o">OpenAI GPT-4o</option>
-          </optgroup>
-          <optgroup label="Local Ollama Models">
-            <option value="llama3.2">Ollama Llama 3.2</option>
-            <option value="qwen2.5-coder:7b">Ollama Qwen 2.5 Coder</option>
-            <option value="deepseek-chat">DeepSeek Chat</option>
-          </optgroup>
-          <option value="__custom__">Custom Model Identifier...</option>
-        </select>
-        <input
-          id="customModelInput"
-          class="model-input"
-          type="text"
-          placeholder="e.g. gemini-2.5-flash"
-          style="display: none; width: 140px;"
-          oninput="onCustomModelInputChange(this.value)"
-        />
-      </div>
+      <div class="header-divider"></div>
 
-      <div class="model-picker-wrap" title="Select tournament length. 1 round uses ~6 LLM calls (ideal for low free tier quotas).">
+      <!-- Providers Hub Configuration Pill -->
+      <button id="btnOpenProviders" class="btn-providers-pill" type="button" onclick="openProvidersModal()"
+        title="Configure AI providers & API keys (Gemini, OpenAI, Ollama)">
+        <span>🔑</span>
+        <span>Providers</span>
+        <span id="providersBadgeCount" class="providers-badge">0 Active</span>
+      </button>
+
+      <!-- Backward compatibility hidden hook for key input -->
+      <input id="apikeyInput" type="hidden" />
+      <span id="apikeyStatus" style="display:none;"></span>
+
+      <!-- Rounds Selector -->
+      <div class="model-picker-wrap" title="Select tournament length">
         <label for="roundsSelect" class="model-picker-label">Rounds:</label>
-        <select id="roundsSelect" class="model-input" style="width: auto; padding: 0.28rem 0.45rem; cursor: pointer;">
-          <option value="1">1 Round (Fast: 6 calls)</option>
-          <option value="2">2 Rounds (12 calls)</option>
-          <option value="3" selected>3 Rounds (Full: 18 calls)</option>
+        <select id="roundsSelect" class="model-input">
+          <option value="1">1 Round</option>
+          <option value="2">2 Rounds</option>
+          <option value="3" selected>3 Rounds</option>
+          <option value="5">5 Rounds</option>
+          <option value="10">All (10 Rounds)</option>
         </select>
       </div>
 
-      <div id="engineModeBadge" class="engine-badge">
-        Adapter: Loading...
+      <!-- Add Problem Benchmark Tool -->
+      <button id="btnAddProblem" class="btn-tool-sm" onclick="openAddProblemModal()"
+        title="Add Custom Benchmark Problem">
+        <span>+</span> Problem
+      </button>
+
+      <div class="header-divider"></div>
+
+      <!-- Export Report Tools -->
+      <div class="header-btn-group">
+        <button id="btnExportJson" class="btn-tool-sm" onclick="downloadReport('json')"
+          title="Export Arbitration Report (JSON)" disabled>📥 JSON</button>
+        <button id="btnExportMd" class="btn-tool-sm" onclick="downloadReport('markdown')"
+          title="Export Arbitration Report (Markdown)" disabled>📥 MD</button>
       </div>
 
+      <div class="header-divider"></div>
+
+      <!-- Main Action Controls -->
       <div class="header-btn-group">
-        <button id="startBtn" class="btn-start" onclick="triggerTournament()">
-          <span>▶</span>
+        <button id="startBtn" class="btn-start" onclick="toggleTournamentAction()"
+          title="Start or Stop Consensus Simulation">
+          <span id="startBtnIcon">▶</span>
           <span id="startBtnText">Start Tournament</span>
         </button>
 
-        <button id="resetBtn" class="btn-reset" onclick="triggerResetTournament()" title="Force stop in-flight tournament and reset back to standby">
-          <span>⏹</span>
+        <button id="resetBtn" class="btn-reset" onclick="triggerResetTournament()"
+          title="Force stop in-flight tournament and reset back to standby">
+          <span>↺</span>
           <span>Reset</span>
         </button>
       </div>
@@ -1479,33 +1745,73 @@
     <!-- Top Metrics Overview Bar -->
     <section class="metrics-grid">
       <div class="metric-card accent-cyan">
-        <span class="metric-title">Consensus State</span>
-        <span id="metricState" class="metric-value">STANDBY</span>
-        <span id="metricStateSub" class="metric-sub">Ready to launch</span>
+        <div class="metric-header">
+          <span class="metric-icon">🏛️</span>
+          <span class="metric-title">Consensus State</span>
+        </div>
+        <div class="metric-value-wrap">
+          <span id="metricState" class="metric-value">STANDBY</span>
+        </div>
+        <div id="metricStateSub" class="metric-sub">Ready to launch</div>
       </div>
 
       <div class="metric-card accent-emerald">
-        <span class="metric-title">Solvent Pool</span>
-        <span id="metricSolvent" class="metric-value">4 / 4</span>
-        <span class="metric-sub">Active staked agents</span>
+        <div class="metric-header">
+          <span class="metric-icon">🛡️</span>
+          <span class="metric-title">Solvent Pool</span>
+        </div>
+        <div class="metric-value-wrap">
+          <span id="metricSolvent" class="metric-value">4 / 4</span>
+        </div>
+        <div class="metric-sub">Active staked agents</div>
       </div>
 
       <div class="metric-card accent-purple">
-        <span class="metric-title">Economy Capital</span>
-        <span id="metricEconomy" class="metric-value">400.00</span>
-        <span class="metric-sub">Total capital collateral</span>
+        <div class="metric-header">
+          <span class="metric-icon">💰</span>
+          <span class="metric-title">Economy Capital</span>
+        </div>
+        <div class="metric-value-wrap">
+          <span class="currency-prefix">$</span>
+          <span id="metricEconomy" class="metric-value">400.00</span>
+        </div>
+        <div class="metric-sub">Total capital collateral</div>
       </div>
 
       <div class="metric-card accent-amber">
-        <span class="metric-title">Oracle Verifications</span>
-        <span id="metricOracle" class="metric-value">0</span>
-        <span id="metricOracleSub" class="metric-sub">0 passed / 0 failed</span>
+        <div class="metric-header">
+          <span class="metric-icon">⚡</span>
+          <span class="metric-title">Oracle Verifications</span>
+        </div>
+        <div class="metric-value-wrap">
+          <span id="metricOracle" class="metric-value">0</span>
+        </div>
+        <div id="metricOracleSub" class="metric-sub">0 passed / 0 failed</div>
+      </div>
+    </section>
+
+    <!-- Real-Time Capital Evolution Chart (Native SVG, Zero External Dependencies) -->
+    <section class="panel chart-panel">
+      <div class="panel-header">
+        <div class="chart-header-left">
+          <span class="panel-title">📈 Real-time Capital Evolution</span>
+          <span id="chartRoundBadge" class="badge chart-round-tag">Round 0</span>
+        </div>
+        <div id="chartLegend" class="chart-legend">
+          <!-- Legend pills dynamically injected -->
+        </div>
+      </div>
+      <div class="chart-svg-container">
+        <svg id="capitalChartSvg" viewBox="0 0 960 250" preserveAspectRatio="xMidYMid meet">
+          <!-- Grid, Axes, Reference lines, Lines, and Markers rendered via JS -->
+        </svg>
+        <div id="chartTooltip" class="chart-tooltip" style="display: none;"></div>
       </div>
     </section>
 
     <!-- Split View: Agents Ledger (Left) & Live Round/Oracle Feed (Right) -->
     <section class="dashboard-split">
-      
+
       <!-- Left Panel: Live Agent Cards -->
       <div class="panel">
         <div class="panel-header">
@@ -1514,10 +1820,12 @@
             <span id="agentCountBadge" class="badge badge-generator">4 Agents</span>
           </div>
           <div class="agent-header-actions">
-            <button class="btn-tool-sm" onclick="openAddAgentModal()" title="Create a new custom agent with specific model, role, and API key">
+            <button class="btn-tool-sm" onclick="openAddAgentModal()"
+              title="Create a new custom agent with specific model, role, and API key">
               <span>+</span> Add Agent
             </button>
-            <button class="btn-tool-sm reset" onclick="resetAgentsRoster()" title="Reset to standard 4 benchmark agents">
+            <button class="btn-tool-sm reset" onclick="resetAgentsRoster()"
+              title="Reset to standard 4 benchmark agents">
               <span>↻</span> Reset
             </button>
           </div>
@@ -1530,7 +1838,7 @@
 
       <!-- Right Panel: Live Round & Oracle Feed -->
       <div class="panel feed-container">
-        
+
         <!-- Problem Context Banner (Updated on each round) -->
         <div id="problemBanner" class="problem-banner" style="display: none;">
           <div class="problem-top">
@@ -1538,7 +1846,8 @@
             <span id="bannerEntrypoint" class="problem-entrypoint">entrypoint: isPalindrome</span>
           </div>
           <div id="bannerTitle" class="problem-title">Palindrome Normalization</div>
-          <div id="bannerTask" class="problem-task">Implement isPalindrome(s: string): boolean that strips non-alphanumeric characters and ignores case.</div>
+          <div id="bannerTask" class="problem-task">Implement isPalindrome(s: string): boolean that strips
+            non-alphanumeric characters and ignores case.</div>
         </div>
 
         <!-- Feed Control Toolbar -->
@@ -1560,7 +1869,8 @@
           <div id="emptyFeedState" class="empty-state">
             <div class="empty-icon">⚡</div>
             <div style="font-weight: 600; color: #fff;">Consensus Engine Ready</div>
-            <div>Click <strong>Start Tournament</strong> to observe multi-agent proposals, adversarial audits, sandbox executions, and Nash settlements live.</div>
+            <div>Click <strong>Start Tournament</strong> to observe multi-agent proposals, adversarial audits, sandbox
+              executions, and Nash settlements live.</div>
           </div>
         </div>
 
@@ -1601,35 +1911,23 @@
 
       <div class="form-group">
         <label class="form-label" for="newAgentModel">Model Selection:</label>
-        <select id="newAgentModel" class="form-select" onchange="onNewAgentModelSelect(this.value)">
-          <optgroup label="Google Gemini">
-            <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (High Quota)</option>
-            <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-            <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-            <option value="gemini-3.8-flash">gemini-3.8-flash</option>
-          </optgroup>
-          <optgroup label="OpenAI">
-            <option value="gpt-4o-mini">gpt-4o-mini</option>
-            <option value="gpt-4o">gpt-4o</option>
-          </optgroup>
-          <optgroup label="Local Ollama">
-            <option value="llama3.2">llama3.2</option>
-            <option value="qwen2.5-coder:7b">qwen2.5-coder:7b</option>
-            <option value="deepseek-chat">deepseek-chat</option>
-          </optgroup>
-          <option value="__custom__">Custom Model Identifier...</option>
+        <select id="newAgentModel" class="form-select" disabled onchange="onNewAgentModelSelect(this.value)">
+          <option value="" disabled selected>Configure an API key or provider first</option>
         </select>
-        <input id="newAgentCustomModel" class="form-input" type="text" placeholder="e.g. mistral:7b" style="display: none; margin-top: 0.35rem;" />
+        <input id="newAgentCustomModel" class="form-input" type="text" placeholder="Custom model id"
+          style="display: none; margin-top: 0.35rem;" />
       </div>
 
       <div class="form-group">
         <label class="form-label" for="newAgentApiKey">Dedicated API Key (Optional):</label>
-        <input id="newAgentApiKey" class="form-input" type="password" placeholder="Leave blank to use global / env key" />
+        <input id="newAgentApiKey" class="form-input" type="password" placeholder="Leave blank to use global / env key"
+          oninput="onNewAgentCredsChangedDebounced()" />
       </div>
 
       <div class="form-group">
         <label class="form-label" for="newAgentBaseUrl">Dedicated Base URL (Optional):</label>
-        <input id="newAgentBaseUrl" class="form-input" type="text" placeholder="e.g. http://localhost:11434/v1" />
+        <input id="newAgentBaseUrl" class="form-input" type="text" placeholder="e.g. http://localhost:11434/v1"
+          oninput="onNewAgentCredsChangedDebounced()" />
       </div>
 
       <div class="modal-actions">
@@ -1653,7 +1951,8 @@
 
       <div class="form-group">
         <label class="form-label" for="keyModalApiKey">Dedicated API Key:</label>
-        <input id="keyModalApiKey" class="form-input" type="password" placeholder="Paste key for this specific agent…" />
+        <input id="keyModalApiKey" class="form-input" type="password"
+          placeholder="Paste key for this specific agent…" />
       </div>
 
       <div class="form-group">
@@ -1665,6 +1964,153 @@
         <button class="btn-secondary" onclick="clearAgentKey()">Clear Key</button>
         <button class="btn-secondary" onclick="closeAgentKeyModal()">Cancel</button>
         <button class="btn-primary" onclick="saveAgentKey()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: AI Providers & Keys Hub -->
+  <div id="providersModal" class="modal-overlay">
+    <div class="modal-card providers-modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🔑</span> AI Providers & Keys Hub
+        </div>
+        <button class="modal-close" onclick="closeProvidersModal()">&times;</button>
+      </div>
+
+      <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0 0 1rem 0; line-height: 1.4;">
+        Configure your AI providers once. Each agent will automatically use the matching API key based on the model
+        assigned on its card, eliminating per-agent key setup.
+      </p>
+
+      <div class="providers-list">
+        <!-- 1. Google Gemini -->
+        <div class="provider-box" id="boxGemini">
+          <div class="provider-box-header">
+            <div class="provider-box-title">
+              <span class="provider-icon">🌟</span>
+              <div>
+                <strong>Google Gemini</strong>
+                <div class="provider-hint">Official Gemini models (gemini-3.5-flash-lite, gemini-3.8-flash,
+                  gemini-4-hydrogen...)</div>
+              </div>
+            </div>
+            <span id="badgeGemini" class="provider-status-badge status-disconnected">Not configured</span>
+          </div>
+          <div class="form-group" style="margin-top: 0.5rem;">
+            <div class="provider-input-row">
+              <input id="inputGeminiKey" type="password" class="form-input"
+                placeholder="Paste API key (AIzaSy... or AQ....)" autocomplete="off" spellcheck="false"
+                oninput="onGeminiKeyInputDebounced(this.value)" />
+              <button type="button" class="btn-eye" onclick="togglePasswordVisibility('inputGeminiKey')">👁</button>
+            </div>
+            <div id="feedbackGemini" class="provider-feedback"></div>
+            <div style="font-size: 0.72rem; color: var(--text-dim); margin-top: 6px; line-height: 1.35;">
+              💡 <strong>Free Tier vs Billing:</strong> With a free Google AI Studio tier, models in the <em>Free Tier
+                OK</em> section (such as <code>gemini-3.5-flash-lite</code> and <code>gemini-4-hydrogen</code>) work out
+              of the box. Models in the <em>Billing Required</em> section (such as <code>gemini-4-carbon</code> or
+              <code>pro</code>) require an active Google Cloud Pay-As-You-Go billing account.
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Ollama Local -->
+        <div class="provider-box" id="boxOllama">
+          <div class="provider-box-header">
+            <div class="provider-box-title">
+              <span class="provider-icon">🦙</span>
+              <div>
+                <strong>Ollama Local</strong>
+                <div class="provider-hint">Private local inference (http://127.0.0.1:11434)</div>
+              </div>
+            </div>
+            <span id="badgeOllama" class="provider-status-badge status-disconnected">Disconnected</span>
+          </div>
+          <div
+            style="display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; margin-top: 0.5rem;">
+            <span style="font-size: 0.74rem; color: var(--text-muted);">
+              Detects locally pulled models on your machine (e.g., qwen3.5:4b, llama3.2).
+            </span>
+            <button id="btnDetectOllama" type="button" class="btn-secondary"
+              style="padding: 0.35rem 0.75rem; font-size: 0.75rem; white-space: nowrap;" onclick="detectOllamaModels()">
+              <span>↻</span> Detect Models
+            </button>
+          </div>
+          <div id="feedbackOllama" class="provider-feedback"></div>
+        </div>
+
+        <!-- 3. OpenAI -->
+        <div class="provider-box" id="boxOpenAi">
+          <div class="provider-box-header">
+            <div class="provider-box-title">
+              <span class="provider-icon">🤖</span>
+              <div>
+                <strong>OpenAI</strong>
+                <div class="provider-hint">Official OpenAI models (gpt-4o, gpt-4o-mini, o3-mini...)</div>
+              </div>
+            </div>
+            <span id="badgeOpenAi" class="provider-status-badge status-disconnected">Not configured</span>
+          </div>
+          <div class="form-group" style="margin-top: 0.5rem;">
+            <div class="provider-input-row">
+              <input id="inputOpenAiKey" type="password" class="form-input" placeholder="sk-proj-..." autocomplete="off"
+                spellcheck="false" oninput="onOpenAiKeyInputDebounced(this.value)" />
+              <button type="button" class="btn-eye" onclick="togglePasswordVisibility('inputOpenAiKey')">👁</button>
+            </div>
+            <div id="feedbackOpenAi" class="provider-feedback"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions" style="margin-top: 1.25rem;">
+        <button class="btn-secondary" onclick="closeProvidersModal()">Close</button>
+        <button class="btn-primary" onclick="saveAndApplyProviders()">Save & Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add / Create Custom Problem -->
+  <div id="addProblemModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🧩</span> Add Custom Tournament Problem
+        </div>
+        <button class="modal-close" onclick="closeAddProblemModal()">&times;</button>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="newProblemId">Problem ID / Slug:</label>
+          <input id="newProblemId" class="form-input" type="text" placeholder="e.g. reverse-words" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="newProblemEntrypoint">Entrypoint Function:</label>
+          <input id="newProblemEntrypoint" class="form-input" type="text" placeholder="e.g. reverseWords" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="newProblemTitle">Problem Title:</label>
+        <input id="newProblemTitle" class="form-input" type="text" placeholder="e.g. Reverse Words in Sentence" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="newProblemTask">Task Specification:</label>
+        <textarea id="newProblemTask" class="form-input" rows="2"
+          style="resize: vertical; font-family: var(--font-mono); font-size: 0.85rem;"
+          placeholder="e.g. Implement reverseWords(s: string): string reversing words while preserving single space"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="newProblemDescription">Description / Edge Cases (Optional):</label>
+        <input id="newProblemDescription" class="form-input" type="text"
+          placeholder="e.g. Handle leading/trailing whitespaces and empty input gracefully" />
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeAddProblemModal()">Cancel</button>
+        <button class="btn-primary" onclick="submitCreateProblem()">Register Problem</button>
       </div>
     </div>
   </div>
@@ -1683,6 +2129,353 @@
     const agentUrlOverrides = {};
 
     // -------------------------------------------------------------------------
+    // Chart State & History (Native SVG, Zero External Dependencies)
+    // -------------------------------------------------------------------------
+    let capitalHistory = {}; // agentId -> [{ round: 0, capital: 100, status: 'ACTIVE' }, ...]
+    let settledRounds = new Set();
+    let totalScheduledRounds = 3;
+    let totalProblemsCount = 10;
+
+    const AGENT_COLORS = [
+      '#06b6d4', // cyan
+      '#10b981', // emerald
+      '#a855f7', // purple
+      '#f59e0b', // amber
+      '#3b82f6', // blue
+      '#ec4899', // rose
+      '#8b5cf6', // violet
+      '#14b8a6', // teal
+    ];
+
+    function getAgentColor(agentId, index) {
+      const hash = String(agentId).split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+      return AGENT_COLORS[(index !== undefined ? index : hash) % AGENT_COLORS.length];
+    }
+
+    function initCapitalHistory(agents) {
+      capitalHistory = {};
+      settledRounds.clear();
+      const currentRoster = agents || agentsState || [];
+      currentRoster.forEach((a, idx) => {
+        capitalHistory[a.id] = [
+          { round: 0, capital: a.capital ?? 100, status: a.status ?? 'ACTIVE' }
+        ];
+      });
+      renderCapitalChart();
+    }
+
+    function renderCapitalChart() {
+      const svg = document.getElementById('capitalChartSvg');
+      const legend = document.getElementById('chartLegend');
+      if (!svg) return;
+
+      const agentIds = Object.keys(capitalHistory);
+      if (agentIds.length === 0) return;
+
+      const width = 960;
+      const height = 260;
+      const margin = { top: 25, right: 35, bottom: 35, left: 55 };
+      const plotW = width - margin.left - margin.right;
+      const plotH = height - margin.top - margin.bottom;
+
+      let maxRound = Math.max(totalScheduledRounds, 3);
+      agentIds.forEach((id) => {
+        capitalHistory[id].forEach((pt) => {
+          if (pt.round > maxRound) maxRound = pt.round;
+        });
+      });
+
+      let minCap = 0;
+      let maxCap = 160;
+      agentIds.forEach((id) => {
+        capitalHistory[id].forEach((pt) => {
+          if (pt.capital > maxCap) maxCap = pt.capital * 1.15;
+        });
+      });
+
+      const getX = (round) => margin.left + (round / maxRound) * plotW;
+      const getY = (cap) => margin.top + plotH - ((cap - minCap) / (maxCap - minCap)) * plotH;
+
+      svg.innerHTML = '';
+
+      // Grid Group
+      const gridGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      gridGroup.setAttribute('class', 'chart-grid');
+
+      // Horizontal grid lines and labels
+      const ySteps = 4;
+      for (let i = 0; i <= ySteps; i++) {
+        const val = minCap + (i / ySteps) * (maxCap - minCap);
+        const y = getY(val);
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', String(margin.left));
+        line.setAttribute('y1', String(y));
+        line.setAttribute('x2', String(margin.left + plotW));
+        line.setAttribute('y2', String(y));
+        line.setAttribute('stroke', '#222f44');
+        line.setAttribute('stroke-width', '1');
+        gridGroup.appendChild(line);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', String(margin.left - 10));
+        text.setAttribute('y', String(y + 4));
+        text.setAttribute('text-anchor', 'end');
+        text.setAttribute('fill', '#64748b');
+        text.setAttribute('font-family', 'var(--font-mono)');
+        text.setAttribute('font-size', '10px');
+        text.textContent = `$${Math.round(val)}`;
+        gridGroup.appendChild(text);
+      }
+
+      // Vertical grid lines and round labels
+      for (let r = 0; r <= maxRound; r++) {
+        const x = getX(r);
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', String(x));
+        line.setAttribute('y1', String(margin.top));
+        line.setAttribute('x2', String(x));
+        line.setAttribute('y2', String(margin.top + plotH));
+        line.setAttribute('stroke', '#151e2e');
+        line.setAttribute('stroke-width', '1');
+        gridGroup.appendChild(line);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', String(x));
+        text.setAttribute('y', String(margin.top + plotH + 20));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('fill', '#94a3b8');
+        text.setAttribute('font-family', 'var(--font-mono)');
+        text.setAttribute('font-size', '11px');
+        text.textContent = r === 0 ? 'Start' : `R${r}`;
+        gridGroup.appendChild(text);
+      }
+
+      // Baseline $100 Reference Line
+      const y100 = getY(100);
+      const baseLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      baseLine.setAttribute('x1', String(margin.left));
+      baseLine.setAttribute('y1', String(y100));
+      baseLine.setAttribute('x2', String(margin.left + plotW));
+      baseLine.setAttribute('y2', String(y100));
+      baseLine.setAttribute('stroke', '#64748b');
+      baseLine.setAttribute('stroke-width', '1.5');
+      baseLine.setAttribute('stroke-dasharray', '4,4');
+      gridGroup.appendChild(baseLine);
+
+      const baseText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      baseText.setAttribute('x', String(margin.left + plotW - 6));
+      baseText.setAttribute('y', String(y100 - 6));
+      baseText.setAttribute('text-anchor', 'end');
+      baseText.setAttribute('fill', '#94a3b8');
+      baseText.setAttribute('font-family', 'var(--font-mono)');
+      baseText.setAttribute('font-size', '10px');
+      baseText.textContent = 'Baseline $100';
+      gridGroup.appendChild(baseText);
+
+      // Insolvent $0 Reference Line
+      const y0 = getY(0);
+      const ruinLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      ruinLine.setAttribute('x1', String(margin.left));
+      ruinLine.setAttribute('y1', String(y0));
+      ruinLine.setAttribute('x2', String(margin.left + plotW));
+      ruinLine.setAttribute('y2', String(y0));
+      ruinLine.setAttribute('stroke', '#f43f5e');
+      ruinLine.setAttribute('stroke-width', '1.5');
+      ruinLine.setAttribute('stroke-dasharray', '2,2');
+      gridGroup.appendChild(ruinLine);
+
+      const ruinText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      ruinText.setAttribute('x', String(margin.left - 10));
+      ruinText.setAttribute('y', String(y0 + 4));
+      ruinText.setAttribute('text-anchor', 'end');
+      ruinText.setAttribute('fill', '#f43f5e');
+      ruinText.setAttribute('font-family', 'var(--font-mono)');
+      ruinText.setAttribute('font-size', '10px');
+      ruinText.textContent = '$0';
+      gridGroup.appendChild(ruinText);
+
+      svg.appendChild(gridGroup);
+
+      // Legend and Curves
+      if (legend) legend.innerHTML = '';
+
+      agentIds.forEach((agentId, idx) => {
+        const points = capitalHistory[agentId];
+        if (!points || points.length === 0) return;
+
+        const color = getAgentColor(agentId, idx);
+        const lastPt = points[points.length - 1];
+
+        if (legend) {
+          const pill = document.createElement('div');
+          pill.className = 'chart-legend-pill';
+          pill.innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; box-shadow: 0 0 8px ${color}; display: inline-block;"></span><strong>${agentId}</strong>: <span style="color: ${color}; font-weight: 700;">$${lastPt.capital.toFixed(2)}</span>`;
+          legend.appendChild(pill);
+        }
+
+        const polyPoints = points.map((p) => `${getX(p.round)},${getY(p.capital)}`).join(' ');
+
+        const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        polyline.setAttribute('points', polyPoints);
+        polyline.setAttribute('fill', 'none');
+        polyline.setAttribute('stroke', color);
+        polyline.setAttribute('stroke-width', '2.5');
+        polyline.setAttribute('stroke-linecap', 'round');
+        polyline.setAttribute('stroke-linejoin', 'round');
+        svg.appendChild(polyline);
+
+        points.forEach((p, pIdx) => {
+          const cx = getX(p.round);
+          const cy = getY(p.capital);
+
+          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          circle.setAttribute('cx', String(cx));
+          circle.setAttribute('cy', String(cy));
+          circle.setAttribute('r', '4');
+          circle.setAttribute('fill', color);
+          circle.setAttribute('stroke', '#080b11');
+          circle.setAttribute('stroke-width', '2');
+          circle.style.cursor = 'pointer';
+          circle.style.transition = 'r 0.15s ease';
+
+          circle.addEventListener('mouseenter', (evt) => {
+            circle.setAttribute('r', '6');
+            const prevCap = pIdx > 0 ? points[pIdx - 1].capital : p.capital;
+            const delta = p.capital - prevCap;
+            const deltaStr = delta >= 0 ? `+${delta.toFixed(2)}` : delta.toFixed(2);
+            showChartTooltip(
+              evt,
+              `
+              <div style="font-weight: 700; color: ${color};">${agentId}</div>
+              <div>Round: ${p.round === 0 ? 'Start' : p.round}</div>
+              <div>Capital: $${p.capital.toFixed(2)} (${deltaStr})</div>
+              <div>Status: ${p.status}</div>
+            `
+            );
+          });
+
+          circle.addEventListener('mouseleave', () => {
+            circle.setAttribute('r', '4');
+            hideChartTooltip();
+          });
+
+          svg.appendChild(circle);
+        });
+      });
+    }
+
+    function showChartTooltip(evt, html) {
+      const tooltip = document.getElementById('chartTooltip');
+      const container = document.querySelector('.chart-svg-container');
+      if (!tooltip || !container) return;
+
+      tooltip.innerHTML = html;
+      tooltip.style.display = 'block';
+
+      const rect = container.getBoundingClientRect();
+      const x = evt.clientX - rect.left + 10;
+      const y = evt.clientY - rect.top - 10;
+      tooltip.style.left = `${Math.min(x, rect.width - 160)}px`;
+      tooltip.style.top = `${Math.max(10, y)}px`;
+    }
+
+    function hideChartTooltip() {
+      const tooltip = document.getElementById('chartTooltip');
+      if (tooltip) tooltip.style.display = 'none';
+    }
+
+    function syncRoundsSelect(totalProblems) {
+      const sel = document.getElementById('roundsSelect');
+      if (!sel) return;
+      const currentVal = parseInt(sel.value, 10) || 3;
+      sel.innerHTML = '';
+      const total = Math.max(3, totalProblems || 10);
+      for (let i = 1; i <= total; i++) {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = i === total ? `All (${i} Rounds)` : `${i} Round${i > 1 ? 's' : ''}`;
+        if (i === currentVal || (currentVal > total && i === total)) {
+          opt.selected = true;
+        }
+        sel.appendChild(opt);
+      }
+    }
+
+    function openAddProblemModal() {
+      if (isRunning) {
+        alert('Cannot add problems while a tournament is in progress.');
+        return;
+      }
+      document.getElementById('newProblemId').value = '';
+      document.getElementById('newProblemTitle').value = '';
+      document.getElementById('newProblemEntrypoint').value = '';
+      document.getElementById('newProblemTask').value = '';
+      document.getElementById('newProblemDescription').value = '';
+      document.getElementById('addProblemModal').classList.add('open');
+    }
+
+    function closeAddProblemModal() {
+      document.getElementById('addProblemModal').classList.remove('open');
+    }
+
+    async function submitCreateProblem() {
+      const id = document.getElementById('newProblemId').value.trim();
+      const title = document.getElementById('newProblemTitle').value.trim();
+      const entrypoint = document.getElementById('newProblemEntrypoint').value.trim();
+      const task = document.getElementById('newProblemTask').value.trim();
+      const description = document.getElementById('newProblemDescription').value.trim();
+
+      if (!id || !title || !task) {
+        alert('Please fill in Problem ID, Title, and Task.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/problems', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, title, entrypoint, task, description }),
+        });
+        const result = await res.json();
+        if (!result.ok) {
+          alert(`Error creating problem: ${result.error}`);
+          return;
+        }
+        closeAddProblemModal();
+        if (result.totalProblems) {
+          totalProblemsCount = result.totalProblems;
+          syncRoundsSelect(result.totalProblems);
+        }
+      } catch (err) {
+        alert(`Request failed: ${err.message}`);
+      }
+    }
+
+    async function downloadReport(format) {
+      try {
+        const res = await fetch(`/api/report?format=${format}`);
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.error || 'Failed to download report.');
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `nashgate-arbitration-report.${format === 'markdown' ? 'md' : 'json'}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert(`Download error: ${err.message}`);
+      }
+    }
+
+    // -------------------------------------------------------------------------
     // Agent Roster & Key Management Functions
     // -------------------------------------------------------------------------
     function openAddAgentModal() {
@@ -1693,11 +2486,16 @@
       document.getElementById('newAgentId').value = '';
       document.getElementById('newAgentRole').value = 'GENERATOR';
       document.getElementById('newAgentCapital').value = '100';
-      document.getElementById('newAgentModel').value = 'gemini-3.5-flash-lite';
       document.getElementById('newAgentCustomModel').style.display = 'none';
       document.getElementById('newAgentCustomModel').value = '';
       document.getElementById('newAgentApiKey').value = '';
       document.getElementById('newAgentBaseUrl').value = '';
+
+      const modelSelect = document.getElementById('newAgentModel');
+      if (modelSelect) {
+        modelSelect.innerHTML = renderGroupedOptions(getGlobalModel());
+        modelSelect.disabled = false;
+      }
       document.getElementById('addAgentModal').classList.add('open');
     }
 
@@ -1722,12 +2520,17 @@
       const modelSelectVal = document.getElementById('newAgentModel').value;
       const customModelVal = document.getElementById('newAgentCustomModel').value.trim();
       const rawModel = modelSelectVal === '__custom__' ? customModelVal : modelSelectVal;
-      const model = sanitizeModelName(rawModel || 'gemini-3.5-flash-lite');
+      const model = (rawModel || '').trim();
       const apiKey = document.getElementById('newAgentApiKey').value.trim() || undefined;
       const baseUrl = document.getElementById('newAgentBaseUrl').value.trim() || undefined;
 
       if (!id) {
         alert('Agent ID / Name cannot be empty.');
+        return;
+      }
+
+      if (!model) {
+        alert('Please introduce an API key or configure a model for this agent.');
         return;
       }
 
@@ -1758,6 +2561,17 @@
         }
         agentModelOverrides[id] = model;
         localStorage.setItem('nashgate_agent_model_' + id, model);
+
+        if (apiKey || baseUrl) {
+          discoverProviderAndModels(apiKey, baseUrl)
+            .then(({ models }) => {
+              if (models && models.length > 0) {
+                agentDiscoveredModels[id] = models;
+                updateAgents(data.agents);
+              }
+            })
+            .catch(() => { });
+        }
 
         updateAgents(data.agents);
         closeAddAgentModal();
@@ -1845,7 +2659,6 @@
           }
           updateAgents(data.agents);
         }
-        }
       } catch (err) {
         alert(`Failed to reset agents: ${err.message}`);
       }
@@ -1890,6 +2703,24 @@
         delete agentUrlOverrides[agentId];
       }
 
+      // Dedicated model discovery for this agent
+      if (keyVal || urlVal) {
+        try {
+          const { models } = await discoverProviderAndModels(keyVal, urlVal);
+          if (models && models.length > 0) {
+            agentDiscoveredModels[agentId] = models;
+            if (!models.includes(agentModelOverrides[agentId])) {
+              agentModelOverrides[agentId] = models[0];
+              localStorage.setItem('nashgate_agent_model_' + agentId, models[0]);
+            }
+          }
+        } catch (err) {
+          console.warn(`Could not fetch models for agent ${agentId}:`, err);
+        }
+      } else {
+        delete agentDiscoveredModels[agentId];
+      }
+
       const agent = agentsState.find((a) => a.id === agentId);
       if (agent) {
         try {
@@ -1905,7 +2736,7 @@
               baseUrl: urlVal || undefined,
             }),
           });
-        } catch {}
+        } catch (_err) { }
       }
 
       closeAgentKeyModal();
@@ -1918,29 +2749,678 @@
       sessionStorage.removeItem('nashgate_url_' + agentId);
       delete agentKeyOverrides[agentId];
       delete agentUrlOverrides[agentId];
+      delete agentDiscoveredModels[agentId];
       closeAgentKeyModal();
       updateAgents(agentsState);
     }
 
     // -------------------------------------------------------------------------
-    // API Key — stored in sessionStorage only (cleared when tab closes)
+    // Universal AI Providers Hub & Model Catalog State
     // -------------------------------------------------------------------------
-    function onApiKeyChange(val) {
-      const trimmed = val ? val.trim() : '';
-      const statusEl = document.getElementById('apikeyStatus');
-      if (trimmed) {
-        sessionStorage.setItem('nashgate_api_key', trimmed);
-        if (statusEl) {
-          statusEl.textContent = '✓ Key set for this session';
-          statusEl.className = 'apikey-status set';
+    const providerKeysState = {
+      gemini: localStorage.getItem('nashgate_key_gemini') || sessionStorage.getItem('nashgate_key_gemini') || '',
+      openai: localStorage.getItem('nashgate_key_openai') || sessionStorage.getItem('nashgate_key_openai') || '',
+    };
+
+    const providerCatalog = {
+      gemini: [],
+      ollama: [],
+      openai: [],
+      mock: ['mock-fast', 'mock-adversarial', 'mock-perfect'],
+    };
+
+    let globalDiscoveredModels = [];
+    let globalDiscoveredProvider = null; // 'gemini' | 'openai' | 'ollama' | null
+    const agentDiscoveredModels = {}; // agentId -> string[]
+    let geminiDebounceTimer = null;
+    let openAiDebounceTimer = null;
+    let newAgentCredsDebounceTimer = null;
+
+    // Helper: Execute direct fetch or fallback to server proxy to bypass CORS
+    async function fetchModelsDirectOrProxy(url, headers = {}) {
+      try {
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          return await res.json();
         }
-      } else {
-        sessionStorage.removeItem('nashgate_api_key');
-        if (statusEl) {
-          statusEl.textContent = '';
-          statusEl.className = 'apikey-status';
+      } catch (_directErr) {
+        // Fallback to server proxy on CORS failure
+      }
+
+      const proxyRes = await fetch('/api/models/discover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, headers }),
+      });
+      if (!proxyRes.ok) {
+        throw new Error(`Failed to fetch models from ${url} (HTTP ${proxyRes.status})`);
+      }
+      return await proxyRes.json();
+    }
+
+    // Curate and filter Gemini models based on official Google AI Studio documentation
+    function filterValidGeminiModels(rawList) {
+      const priorityOrder = [
+        'gemini-3.5-flash-lite',
+        'gemini-3.1-flash-lite',
+        'gemini-3.6-flash',
+        'gemini-3.5-flash',
+        'gemini-flash-lite-latest',
+        'gemini-4-hydrogen',
+        'gemini-3.8-flash',
+        'gemini-3.7-flash',
+        'gemini-flash-latest',
+        'gemini-4-argon',
+        'gemini-4-carbon',
+        'gemini-3.1-pro-preview',
+        'gemini-pro-latest',
+      ];
+
+      const cleanList = rawList
+        .map((m) => (typeof m === 'string' ? m : m.name || '').replace(/^models\//, ''))
+        .filter((name) => {
+          if (!name.startsWith('gemini-')) return false;
+          // Filter out specialized media, audio, or agentic tools not meant for chat/code completions
+          if (
+            name.includes('tts') ||
+            name.includes('live') ||
+            name.includes('image') ||
+            name.includes('banana') ||
+            name.includes('transcribe') ||
+            name.includes('translate') ||
+            name.includes('omni') ||
+            name.includes('embedding') ||
+            name.includes('decision') ||
+            name.includes('deep-research') ||
+            name.includes('robotics') ||
+            name.includes('computer-use') ||
+            name.includes('aqa') ||
+            name.includes('imagen')
+          ) {
+            return false;
+          }
+          // Filter out shut down legacy models
+          if (
+            name === 'gemini-2.0-flash' ||
+            name === 'gemini-2.0-flash-lite' ||
+            name === 'gemini-3.1-flash-lite-preview' ||
+            name === 'gemini-3-pro-preview' ||
+            name.startsWith('gemini-1.') ||
+            name.startsWith('gemini-1.0') ||
+            name.startsWith('gemini-1.5')
+          ) {
+            return false;
+          }
+          return true;
+        });
+
+      const unique = [...new Set(cleanList)];
+      unique.sort((a, b) => {
+        const idxA = priorityOrder.indexOf(a);
+        const idxB = priorityOrder.indexOf(b);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return a.localeCompare(b);
+      });
+
+      if (unique.length === 0) {
+        return [
+          'gemini-3.5-flash-lite',
+          'gemini-3.8-flash',
+          'gemini-4-hydrogen',
+          'gemini-4-argon',
+          'gemini-4-carbon',
+          'gemini-3.6-flash',
+          'gemini-3.1-flash-lite',
+        ];
+      }
+      return unique;
+    }
+
+    async function verifyGeminiKey(rawKey, userTriggered = false) {
+      const key = (rawKey || '').trim();
+      const badge = document.getElementById('badgeGemini');
+      const feedback = document.getElementById('feedbackGemini');
+
+      if (!key) {
+        providerKeysState.gemini = '';
+        localStorage.removeItem('nashgate_key_gemini');
+        sessionStorage.removeItem('nashgate_key_gemini');
+        providerCatalog.gemini = [];
+        if (badge) {
+          badge.textContent = 'Not configured';
+          badge.className = 'provider-status-badge status-disconnected';
+        }
+        if (feedback) {
+          feedback.textContent = '';
+          feedback.className = 'provider-feedback';
+        }
+        refreshDiscoveredState();
+        return;
+      }
+
+      if (badge) {
+        badge.textContent = 'Verifying…';
+        badge.className = 'provider-status-badge status-testing';
+      }
+      if (feedback) {
+        feedback.textContent = 'Validating key with Google AI Studio…';
+        feedback.className = 'provider-feedback';
+      }
+
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`;
+        const data = await fetchModelsDirectOrProxy(endpoint);
+        const rawModels = (data.models || []).filter(
+          (m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent')
+        );
+        const validModels = filterValidGeminiModels(rawModels);
+
+        providerKeysState.gemini = key;
+        localStorage.setItem('nashgate_key_gemini', key);
+        sessionStorage.setItem('nashgate_key_gemini', key);
+        providerCatalog.gemini = validModels;
+
+        if (badge) {
+          badge.textContent = `✓ ${validModels.length} Models`;
+          badge.className = 'provider-status-badge status-connected';
+        }
+        if (feedback) {
+          feedback.textContent = `Models ready: ${validModels.slice(0, 3).join(', ')}${validModels.length > 3 ? '...' : ''}`;
+          feedback.className = 'provider-feedback feedback-success';
+        }
+      } catch (err) {
+        if (badge) {
+          badge.textContent = 'Key Error';
+          badge.className = 'provider-status-badge status-disconnected';
+        }
+        if (feedback) {
+          feedback.textContent = `Error: ${err.message || 'Invalid key or network error'}`;
+          feedback.className = 'provider-feedback feedback-error';
+        }
+        providerCatalog.gemini = [];
+      }
+      refreshDiscoveredState();
+    }
+
+    async function detectOllamaModels(showNotice = false) {
+      const badge = document.getElementById('badgeOllama');
+      const feedback = document.getElementById('feedbackOllama');
+      const btn = document.getElementById('btnDetectOllama');
+
+      if (btn) btn.classList.add('loading');
+      if (badge) {
+        badge.textContent = 'Checking…';
+        badge.className = 'provider-status-badge status-testing';
+      }
+      if (feedback) {
+        feedback.textContent = 'Querying http://127.0.0.1:11434...';
+        feedback.className = 'provider-feedback';
+      }
+
+      try {
+        let data = null;
+        try {
+          data = await fetchModelsDirectOrProxy('http://127.0.0.1:11434/api/tags');
+        } catch (_e1) {
+          data = await fetchModelsDirectOrProxy('http://localhost:11434/api/tags');
+        }
+
+        const models = (data.models || []).map((m) => m.name || m.model).filter(Boolean);
+        if (models.length > 0) {
+          providerCatalog.ollama = [...new Set(models)];
+          if (badge) {
+            badge.textContent = `✓ ${models.length} Models`;
+            badge.className = 'provider-status-badge status-connected';
+          }
+          if (feedback) {
+            feedback.textContent = `Ollama online: ${models.slice(0, 3).join(', ')}${models.length > 3 ? '...' : ''}`;
+            feedback.className = 'provider-feedback feedback-success';
+          }
+        } else {
+          providerCatalog.ollama = [];
+          if (badge) {
+            badge.textContent = '0 models';
+            badge.className = 'provider-status-badge status-testing';
+          }
+          if (feedback) {
+            feedback.textContent = 'Ollama is running but has no pulled models. Run: ollama pull qwen3.5:4b';
+            feedback.className = 'provider-feedback feedback-warning';
+          }
+        }
+      } catch (err) {
+        providerCatalog.ollama = [];
+        if (badge) {
+          badge.textContent = 'Disconnected';
+          badge.className = 'provider-status-badge status-disconnected';
+        }
+        if (feedback) {
+          feedback.textContent = 'Ollama not responding on 127.0.0.1:11434 (start "ollama serve" to use local models).';
+          feedback.className = 'provider-feedback feedback-warning';
+        }
+      } finally {
+        if (btn) btn.classList.remove('loading');
+      }
+      refreshDiscoveredState();
+    }
+
+    async function verifyOpenAiKey(rawKey, userTriggered = false) {
+      const key = (rawKey || '').trim();
+      const badge = document.getElementById('badgeOpenAi');
+      const feedback = document.getElementById('feedbackOpenAi');
+
+      if (!key) {
+        providerKeysState.openai = '';
+        localStorage.removeItem('nashgate_key_openai');
+        sessionStorage.removeItem('nashgate_key_openai');
+        providerCatalog.openai = [];
+        if (badge) {
+          badge.textContent = 'Not configured';
+          badge.className = 'provider-status-badge status-disconnected';
+        }
+        if (feedback) {
+          feedback.textContent = '';
+          feedback.className = 'provider-feedback';
+        }
+        refreshDiscoveredState();
+        return;
+      }
+
+      if (badge) {
+        badge.textContent = 'Verifying…';
+        badge.className = 'provider-status-badge status-testing';
+      }
+      if (feedback) {
+        feedback.textContent = 'Validating key with OpenAI...';
+        feedback.className = 'provider-feedback';
+      }
+
+      try {
+        const endpoint = 'https://api.openai.com/v1/models';
+        const data = await fetchModelsDirectOrProxy(endpoint, {
+          Authorization: `Bearer ${key}`,
+        });
+        const list = (data.data || []).map((m) => m.id).filter(Boolean);
+        const filtered = list
+          .filter(
+            (id) =>
+              /^(gpt-4o|gpt-4-turbo|o1|o3|o4)/i.test(id) &&
+              !id.includes('realtime') &&
+              !id.includes('audio')
+          )
+          .sort();
+        const models = filtered.length > 0 ? filtered : ['gpt-4o-mini', 'gpt-4o', 'o3-mini'];
+
+        providerKeysState.openai = key;
+        localStorage.setItem('nashgate_key_openai', key);
+        sessionStorage.setItem('nashgate_key_openai', key);
+        providerCatalog.openai = [...new Set(models)];
+
+        if (badge) {
+          badge.textContent = `✓ ${providerCatalog.openai.length} Models`;
+          badge.className = 'provider-status-badge status-connected';
+        }
+        if (feedback) {
+          feedback.textContent = `Models ready: ${providerCatalog.openai.slice(0, 3).join(', ')}...`;
+          feedback.className = 'provider-feedback feedback-success';
+        }
+      } catch (err) {
+        if (badge) {
+          badge.textContent = 'Key Error';
+          badge.className = 'provider-status-badge status-disconnected';
+        }
+        if (feedback) {
+          feedback.textContent = `Error: ${err.message || 'Invalid key or insufficient quota'}`;
+          feedback.className = 'provider-feedback feedback-error';
+        }
+        providerCatalog.openai = [];
+      }
+      refreshDiscoveredState();
+    }
+
+    function refreshDiscoveredState() {
+      globalDiscoveredModels = [
+        ...providerCatalog.gemini,
+        ...providerCatalog.ollama,
+        ...providerCatalog.openai,
+      ];
+      if (providerCatalog.gemini.length > 0) globalDiscoveredProvider = 'gemini';
+      else if (providerCatalog.ollama.length > 0) globalDiscoveredProvider = 'ollama';
+      else if (providerCatalog.openai.length > 0) globalDiscoveredProvider = 'openai';
+      else globalDiscoveredProvider = null;
+
+      updateProvidersHeaderPill();
+      populateAllModelSelects();
+    }
+
+    function renderGroupedOptions(selectedValue) {
+      let html = '';
+      let matchFound = false;
+
+      // 1. Google Gemini
+      if (providerCatalog.gemini.length > 0) {
+        const getGeminiCategory = (m) => {
+          if (m.includes('carbon') || m.includes('argon') || m.includes('pro')) return 'paid';
+          if (m === 'gemini-3.8-flash' || m === 'gemini-3.7-flash' || (m.includes('latest') && !m.includes('lite'))) return 'preview';
+          return 'free';
+        };
+
+        const freeModels = providerCatalog.gemini.filter((m) => getGeminiCategory(m) === 'free');
+        const paidModels = providerCatalog.gemini.filter((m) => getGeminiCategory(m) === 'paid');
+        const previewModels = providerCatalog.gemini.filter((m) => getGeminiCategory(m) === 'preview');
+
+        if (freeModels.length > 0) {
+          html += `<optgroup label="🌟 Google Gemini — Free Tier OK (No Cost)">`;
+          for (const m of freeModels) {
+            const isSel = m === selectedValue;
+            if (isSel) matchFound = true;
+            let label = m;
+            if (m === 'gemini-3.5-flash-lite') label = `${m} (Recommended - Fast)`;
+            else if (m === 'gemini-4-hydrogen') label = `${m} (Gemini 4 Frontier)`;
+            html += `<option value="${escapeHtml(m)}" ${isSel ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+          }
+          html += `</optgroup>`;
+        }
+
+        if (paidModels.length > 0) {
+          html += `<optgroup label="💼 Google Gemini — Billing Required (Pay-As-You-Go)">`;
+          for (const m of paidModels) {
+            const isSel = m === selectedValue;
+            if (isSel) matchFound = true;
+            let label = m;
+            if (m === 'gemini-4-carbon') label = `${m} (Gemini 4 Flagship - 1M Context)`;
+            else if (m === 'gemini-4-argon') label = `${m} (Gemini 4 Reasoning)`;
+            else if (m.includes('pro')) label = `${m} (Pro Tier)`;
+            html += `<option value="${escapeHtml(m)}" ${isSel ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+          }
+          html += `</optgroup>`;
+        }
+
+        if (previewModels.length > 0) {
+          html += `<optgroup label="⚡ Google Gemini — Previews (High Demand Upstream)">`;
+          for (const m of previewModels) {
+            const isSel = m === selectedValue;
+            if (isSel) matchFound = true;
+            let label = m;
+            if (m === 'gemini-3.8-flash') label = `${m} (SWE / Agents - High Demand)`;
+            else if (m === 'gemini-3.7-flash') label = `${m} (Subject to delays)`;
+            html += `<option value="${escapeHtml(m)}" ${isSel ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+          }
+          html += `</optgroup>`;
         }
       }
+
+      // 2. Ollama Local
+      if (providerCatalog.ollama.length > 0) {
+        html += `<optgroup label="🦙 Ollama Local (${providerCatalog.ollama.length})">`;
+        for (const m of providerCatalog.ollama) {
+          const isSel = m === selectedValue;
+          if (isSel) matchFound = true;
+          html += `<option value="${escapeHtml(m)}" ${isSel ? 'selected' : ''}>${escapeHtml(m)}</option>`;
+        }
+        html += `</optgroup>`;
+      }
+
+      // 3. OpenAI
+      if (providerCatalog.openai.length > 0) {
+        html += `<optgroup label="🤖 OpenAI (${providerCatalog.openai.length})">`;
+        for (const m of providerCatalog.openai) {
+          const isSel = m === selectedValue;
+          if (isSel) matchFound = true;
+          html += `<option value="${escapeHtml(m)}" ${isSel ? 'selected' : ''}>${escapeHtml(m)}</option>`;
+        }
+        html += `</optgroup>`;
+      }
+
+      // 4. Offline / Simulation
+      html += `<optgroup label="🧪 Offline Simulation">`;
+      for (const m of providerCatalog.mock) {
+        const isSel = m === selectedValue;
+        if (isSel) matchFound = true;
+        html += `<option value="${escapeHtml(m)}" ${isSel ? 'selected' : ''}>${escapeHtml(m)}</option>`;
+      }
+      html += `</optgroup>`;
+
+      // Custom fallback if selectedValue is not in catalog
+      if (selectedValue && !matchFound) {
+        html += `<optgroup label="Custom Model">`;
+        html += `<option value="${escapeHtml(selectedValue)}" selected>${escapeHtml(selectedValue)}</option>`;
+        html += `</optgroup>`;
+      }
+
+      return html;
+    }
+
+    function populateAllModelSelects() {
+      const headerSelect = document.getElementById('modelSelect');
+      const currentGlobal = getGlobalModel();
+
+      if (headerSelect) {
+        headerSelect.innerHTML = renderGroupedOptions(currentGlobal);
+        headerSelect.disabled = false;
+        if (!headerSelect.value) {
+          const firstReal =
+            providerCatalog.gemini[0] ||
+            providerCatalog.ollama[0] ||
+            providerCatalog.openai[0] ||
+            providerCatalog.mock[0];
+          headerSelect.value = firstReal;
+          syncHeaderModelUI(firstReal);
+        }
+      }
+
+      const newAgentModel = document.getElementById('newAgentModel');
+      if (newAgentModel) {
+        newAgentModel.innerHTML = renderGroupedOptions(newAgentModel.value || currentGlobal);
+        newAgentModel.disabled = false;
+      }
+
+      for (const a of agentsState) {
+        const select = document.getElementById(`agent-model-${a.id}`);
+        if (select) {
+          const currentAgentModel =
+            agentModelOverrides[a.id] ||
+            localStorage.getItem('nashgate_agent_model_' + a.id) ||
+            a.model ||
+            currentGlobal;
+          select.innerHTML = renderGroupedOptions(currentAgentModel);
+          select.disabled = false;
+          if (select.value) {
+            agentModelOverrides[a.id] = select.value;
+          }
+        }
+      }
+
+      updateEngineModeBadge();
+    }
+
+    function updateProvidersHeaderPill() {
+      const countEl = document.getElementById('providersBadgeCount');
+      const pillBtn = document.getElementById('btnOpenProviders');
+      let activeCount = 0;
+      const activeNames = [];
+
+      if (providerKeysState.gemini && providerCatalog.gemini.length > 0) {
+        activeCount++;
+        activeNames.push('Gemini');
+      }
+      if (providerCatalog.ollama.length > 0) {
+        activeCount++;
+        activeNames.push('Ollama');
+      }
+      if (providerKeysState.openai && providerCatalog.openai.length > 0) {
+        activeCount++;
+        activeNames.push('OpenAI');
+      }
+
+      if (countEl) {
+        if (activeCount > 0) {
+          countEl.textContent = `${activeCount} Active`;
+          countEl.className = 'providers-badge active';
+        } else {
+          countEl.textContent = '0 Active';
+          countEl.className = 'providers-badge';
+        }
+      }
+      if (pillBtn) {
+        pillBtn.title =
+          activeCount > 0
+            ? `Connected providers: ${activeNames.join(', ')}. Click to manage.`
+            : 'Configure providers (Gemini, Ollama, OpenAI) to unlock frontier models.';
+      }
+    }
+
+    function updateEngineModeBadge() {
+      if (!engineModeBadge) return;
+      const model = getGlobalModel();
+      if (providerCatalog.ollama.includes(model)) {
+        engineModeBadge.textContent = '🦙 Ollama Local';
+        engineModeBadge.title = `Active local model: ${model}`;
+      } else if (model.startsWith('gemini-') && providerKeysState.gemini) {
+        engineModeBadge.textContent = '🌟 Google Gemini';
+        engineModeBadge.title = `Active Gemini model: ${model}`;
+      } else if (
+        (model.startsWith('gpt-') || model.startsWith('o1') || model.startsWith('o3')) &&
+        providerKeysState.openai
+      ) {
+        engineModeBadge.textContent = '🤖 OpenAI Live';
+        engineModeBadge.title = `Active OpenAI model: ${model}`;
+      } else if (model.startsWith('mock-')) {
+        engineModeBadge.textContent = '🧪 Offline Simulation';
+        engineModeBadge.title = 'Offline simulation mode without API usage';
+      } else {
+        engineModeBadge.textContent = '⚡ LLM Configured';
+        engineModeBadge.title = `Active model: ${model}`;
+      }
+    }
+
+    function openProvidersModal() {
+      const modal = document.getElementById('providersModal');
+      if (!modal) return;
+      const inpGemini = document.getElementById('inputGeminiKey');
+      const inpOpenAi = document.getElementById('inputOpenAiKey');
+      if (inpGemini) inpGemini.value = providerKeysState.gemini || '';
+      if (inpOpenAi) inpOpenAi.value = providerKeysState.openai || '';
+
+      if (providerKeysState.gemini) verifyGeminiKey(providerKeysState.gemini, false);
+      if (providerKeysState.openai) verifyOpenAiKey(providerKeysState.openai, false);
+      detectOllamaModels(false);
+
+      modal.classList.add('open');
+    }
+
+    function closeProvidersModal() {
+      const modal = document.getElementById('providersModal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    function saveAndApplyProviders() {
+      const inpGemini = document.getElementById('inputGeminiKey');
+      const inpOpenAi = document.getElementById('inputOpenAiKey');
+
+      if (inpGemini) {
+        const gemVal = inpGemini.value.trim();
+        providerKeysState.gemini = gemVal;
+        if (gemVal) localStorage.setItem('nashgate_key_gemini', gemVal);
+        else localStorage.removeItem('nashgate_key_gemini');
+      }
+
+      if (inpOpenAi) {
+        const oaiVal = inpOpenAi.value.trim();
+        providerKeysState.openai = oaiVal;
+        if (oaiVal) localStorage.setItem('nashgate_key_openai', oaiVal);
+        else localStorage.removeItem('nashgate_key_openai');
+      }
+
+      populateAllModelSelects();
+      updateProvidersHeaderPill();
+      closeProvidersModal();
+    }
+
+    function togglePasswordVisibility(inputId) {
+      const input = document.getElementById(inputId);
+      if (input) {
+        input.type = input.type === 'password' ? 'text' : 'password';
+      }
+    }
+
+    function onGeminiKeyInputDebounced(val) {
+      if (geminiDebounceTimer) clearTimeout(geminiDebounceTimer);
+      geminiDebounceTimer = setTimeout(() => {
+        verifyGeminiKey(val, true);
+      }, 500);
+    }
+
+    function onOpenAiKeyInputDebounced(val) {
+      if (openAiDebounceTimer) clearTimeout(openAiDebounceTimer);
+      openAiDebounceTimer = setTimeout(() => {
+        verifyOpenAiKey(val, true);
+      }, 500);
+    }
+
+    function onNewAgentCredsChangedDebounced() {
+      if (newAgentCredsDebounceTimer) clearTimeout(newAgentCredsDebounceTimer);
+      newAgentCredsDebounceTimer = setTimeout(async () => {
+        const key = document.getElementById('newAgentApiKey')?.value?.trim();
+        const url = document.getElementById('newAgentBaseUrl')?.value?.trim();
+        const select = document.getElementById('newAgentModel');
+        if (key || url) {
+          try {
+            const { models } = await discoverProviderAndModels(key, url);
+            if (models && models.length > 0) {
+              select.innerHTML = renderGroupedOptions(models[0]);
+              return;
+            }
+          } catch (_e) { }
+        }
+        select.innerHTML = renderGroupedOptions(getGlobalModel());
+      }, 500);
+    }
+
+    // Backward compatibility helper
+    async function discoverProviderAndModels(apiKey, baseUrl = '') {
+      const cleanKey = (apiKey || '').trim();
+      const cleanUrl = (baseUrl || '').trim();
+
+      if (cleanUrl.includes('11434') || cleanUrl.endsWith('/api') || (!cleanKey && cleanUrl)) {
+        const rootUrl = cleanUrl ? cleanUrl.replace(/\/v1\/?$/, '') : 'http://127.0.0.1:11434';
+        const endpoint = `${rootUrl.replace(/\/+$/, '')}/api/tags`;
+        let data;
+        try {
+          data = await fetchModelsDirectOrProxy(endpoint);
+        } catch (_tagErr) {
+          const altEndpoint = endpoint.includes('127.0.0.1')
+            ? endpoint.replace('127.0.0.1', 'localhost')
+            : endpoint.replace('localhost', '127.0.0.1');
+          data = await fetchModelsDirectOrProxy(altEndpoint);
+        }
+        const models = (data.models || []).map((m) => m.name || m.model).filter(Boolean);
+        return { provider: 'ollama', models: [...new Set(models)], baseUrl: cleanUrl || 'http://127.0.0.1:11434/v1' };
+      }
+
+      if (cleanKey.startsWith('AIza') || cleanKey.startsWith('AQ.')) {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(cleanKey)}`;
+        const data = await fetchModelsDirectOrProxy(endpoint);
+        const rawModels = (data.models || []).filter(
+          (m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent')
+        );
+        const models = filterValidGeminiModels(rawModels);
+        return { provider: 'gemini', models };
+      }
+
+      if (cleanKey.startsWith('sk-')) {
+        const endpoint = cleanUrl ? `${cleanUrl.replace(/\/+$/, '')}/models` : 'https://api.openai.com/v1/models';
+        const data = await fetchModelsDirectOrProxy(endpoint, {
+          Authorization: `Bearer ${cleanKey}`,
+        });
+        const list = (data.data || []).map((m) => m.id).filter(Boolean);
+        const filtered = list.filter((id) => /^(gpt-|o1-|o3-|o4-)/i.test(id)).sort();
+        const models = filtered.length > 0 ? filtered : list;
+        return { provider: 'openai', models: [...new Set(models)] };
+      }
+
+      return { provider: null, models: [] };
     }
 
     function toggleApiKeyVisibility() {
@@ -1950,31 +3430,46 @@
     }
 
     function getSessionApiKey() {
-      return sessionStorage.getItem('nashgate_api_key') || '';
-    }
-
-    function sanitizeModelName(name) {
-      if (!name) return 'gemini-3.5-flash-lite';
-      let clean = name.trim();
-      if (clean.startsWith('models/')) {
-        clean = clean.substring('models/'.length);
-      }
-      if (clean.startsWith('gemini-2.5')) {
-        return 'gemini-3.5-flash-lite';
-      }
-      return clean;
+      return providerKeysState.gemini || providerKeysState.openai || sessionStorage.getItem('nashgate_api_key') || '';
     }
 
     function getGlobalModel() {
-      return sanitizeModelName(localStorage.getItem('nashgate_selected_model') || 'gemini-3.5-flash-lite');
+      const select = document.getElementById('modelSelect');
+      const saved = localStorage.getItem('nashgate_selected_model');
+      if (select && select.value && select.value !== '__custom__') {
+        const val = select.value;
+        if (
+          val === 'gemini-2.0-flash' ||
+          val === 'gemini-2.0-flash-lite' ||
+          val === 'gemini-2.5-flash'
+        ) {
+          return 'gemini-3.5-flash-lite';
+        }
+        return val;
+      }
+      if (saved) {
+        if (
+          saved === 'gemini-2.0-flash' ||
+          saved === 'gemini-2.0-flash-lite' ||
+          saved === 'gemini-2.5-flash'
+        ) {
+          return 'gemini-3.5-flash-lite';
+        }
+        return saved;
+      }
+      const firstReal =
+        providerCatalog.gemini[0] ||
+        providerCatalog.ollama[0] ||
+        providerCatalog.openai[0] ||
+        providerCatalog.mock[0];
+      return firstReal || 'gemini-3.5-flash-lite';
     }
 
     function syncHeaderModelUI(rawModel) {
-      const clean = sanitizeModelName(rawModel);
+      const clean = (rawModel || '').trim();
+      if (!clean) return;
       localStorage.setItem('nashgate_selected_model', clean);
-      if (engineModeBadge) {
-        engineModeBadge.textContent = `⚡ Live LLM (${clean})`;
-      }
+      updateEngineModeBadge();
 
       const modelSel = document.getElementById('modelSelect');
       const customInput = document.getElementById('customModelInput');
@@ -2008,7 +3503,7 @@
       let chosen = val;
       if (val === '__custom__') {
         if (customInput) customInput.style.display = 'inline-block';
-        chosen = customInput?.value?.trim() || 'gemini-3.5-flash-lite';
+        chosen = customInput?.value?.trim() || '';
       } else {
         if (customInput) customInput.style.display = 'none';
       }
@@ -2027,9 +3522,7 @@
     }
 
     function clearKeyAndRunMock() {
-      const apikeyEl = document.getElementById('apikeyInput');
-      if (apikeyEl) apikeyEl.value = '';
-      onApiKeyChange('');
+      syncHeaderModelUI('mock-fast');
       triggerTournament();
     }
 
@@ -2038,15 +3531,26 @@
     }
 
     async function onAgentModelChange(agentId, newModel) {
-      const clean = sanitizeModelName(newModel);
+      const clean = (newModel || '').trim();
       agentModelOverrides[agentId] = clean;
       localStorage.setItem('nashgate_agent_model_' + agentId, clean);
+
+      const isCloud = clean.startsWith('gemini-') || clean.startsWith('gpt-') || clean.startsWith('o1') || clean.startsWith('o3');
+      const existingKey = agentKeyOverrides[agentId] || sessionStorage.getItem('nashgate_key_' + agentId) || undefined;
+      let existingUrl = agentUrlOverrides[agentId] || sessionStorage.getItem('nashgate_url_' + agentId) || undefined;
+
+      if (isCloud && existingUrl && existingUrl.includes('11434')) {
+        existingUrl = undefined;
+        delete agentUrlOverrides[agentId];
+        sessionStorage.removeItem('nashgate_url_' + agentId);
+      }
 
       const agent = agentsState.find((a) => a.id === agentId);
       if (agent) {
         agent.model = clean;
-        const existingKey = agentKeyOverrides[agentId] || sessionStorage.getItem('nashgate_key_' + agentId) || undefined;
-        const existingUrl = agentUrlOverrides[agentId] || sessionStorage.getItem('nashgate_url_' + agentId) || agent.baseUrl || undefined;
+        if (isCloud && agent.baseUrl && agent.baseUrl.includes('11434')) {
+          agent.baseUrl = undefined;
+        }
         try {
           await fetch('/api/agents', {
             method: 'POST',
@@ -2060,7 +3564,7 @@
               baseUrl: existingUrl,
             }),
           });
-        } catch {}
+        } catch (_err) { }
       }
     }
 
@@ -2095,37 +3599,65 @@
 
       es.onopen = () => {
         streamStatus.classList.remove('offline');
-        streamStatusText.textContent = 'SSE Stream Live';
+        streamStatusText.textContent = 'Live';
       };
 
       es.onerror = () => {
         streamStatus.classList.add('offline');
-        streamStatusText.textContent = 'Disconnected — Reconnecting';
+        streamStatusText.textContent = 'Reconnecting';
       };
 
       // 1. Initial State Snapshot
       es.addEventListener('state:init', (e) => {
         const data = JSON.parse(e.data);
         let savedModel = localStorage.getItem('nashgate_selected_model');
-        const activeModelName = sanitizeModelName(savedModel || data.resolvedModel || 'gemini-3.5-flash-lite');
-        syncHeaderModelUI(activeModelName);
-        engineModeBadge.textContent = data.adapterMode === 'live-llm' 
-          ? `⚡ Live LLM (${activeModelName})` 
-          : '🤖 Offline Mock Catalog';
-        
+        const activeModelName = (savedModel || data.resolvedModel || '').trim();
+        if (activeModelName) {
+          syncHeaderModelUI(activeModelName);
+        }
+        if (engineModeBadge) {
+          engineModeBadge.textContent = data.adapterMode === 'live-llm'
+            ? '⚡ Live LLM'
+            : '🤖 Mock Mode';
+          engineModeBadge.title = `Adapter Mode: ${data.adapterMode} (${activeModelName})`;
+        }
+
+        if (data.totalProblems || (data.problems && data.problems.length)) {
+          totalProblemsCount = data.totalProblems || data.problems.length;
+          syncRoundsSelect(totalProblemsCount);
+        }
+
         if (data.agents && data.agents.length > 0) {
           updateAgents(data.agents);
+          initCapitalHistory(data.agents);
         }
         setRunningState(data.isRunning);
+      });
+
+      // 1b. Custom Problem Added Event
+      es.addEventListener('problem:added', (e) => {
+        const data = JSON.parse(e.data);
+        if (data.totalProblems) {
+          totalProblemsCount = data.totalProblems;
+          syncRoundsSelect(data.totalProblems);
+        }
       });
 
       // 2. Tournament Kickoff
       es.addEventListener('tournament:start', (e) => {
         const data = JSON.parse(e.data);
         setRunningState(true);
+        totalScheduledRounds = data.totalRounds || (document.getElementById('roundsSelect') ? parseInt(document.getElementById('roundsSelect').value, 10) : 3);
+        const chartRoundBadge = document.getElementById('chartRoundBadge');
+        if (chartRoundBadge) chartRoundBadge.textContent = 'Round 0';
+        initCapitalHistory(data.initialAgents);
+
         if (data.resolvedModel) {
-          const cleanModel = sanitizeModelName(data.resolvedModel);
-          engineModeBadge.textContent = `⚡ Live LLM (${cleanModel})`;
+          const cleanModel = data.resolvedModel.trim();
+          if (engineModeBadge) {
+            engineModeBadge.textContent = '⚡ Live LLM';
+            engineModeBadge.title = `Active Model: ${cleanModel}`;
+          }
           syncHeaderModelUI(cleanModel);
         }
         oraclePassedCount = 0;
@@ -2133,12 +3665,12 @@
         updateOracleMetrics();
         clearFeed();
         updateAgents(data.initialAgents);
-        
+
         appendEventCard({
           type: 'tournament',
           badgeText: '🏆 Tournament Started',
           badgeClass: 'event-badge-proposal',
-          title: `Multi-Round Tournament Launched (${data.totalRounds} Rounds)`,
+          title: `Multi-Round Tournament Launched (${totalScheduledRounds} Rounds)`,
           body: `<p>Arbitration protocol initialized with 4 staked agents. Capital is at risk; non-compliant agents face asymmetric liquidation penalties.</p>`
         });
       });
@@ -2147,12 +3679,13 @@
       es.addEventListener('round:start', (e) => {
         const data = JSON.parse(e.data);
         currentRound = data.roundNumber;
-        
+        const maxR = data.totalRounds || totalScheduledRounds || totalProblemsCount || 3;
+
         metricState.textContent = `ROUND ${data.roundNumber}`;
         metricStateSub.textContent = `Problem: ${data.problem.title}`;
 
         problemBanner.style.display = 'flex';
-        bannerRoundTag.textContent = `ROUND ${data.roundNumber} OF 3`;
+        bannerRoundTag.textContent = `ROUND ${data.roundNumber} OF ${maxR}`;
         bannerEntrypoint.textContent = `entrypoint: ${data.problem.entrypoint || 'solve'}`;
         bannerTitle.textContent = data.problem.title;
         bannerTask.textContent = `${data.problem.task} ${data.problem.description || ''}`;
@@ -2358,9 +3891,9 @@
           title: `Sandbox Oracle Verification (${ev.executionTimeMs}ms)`,
           body: `
             <div style="margin-bottom: 8px;">
-              ${passed 
-                ? `<span style="color: var(--emerald); font-weight: 600;">Generator survived!</span> Auditor's challenge was a false positive.`
-                : `<span style="color: var(--rose); font-weight: 600;">Adversarial breakdown!</span> Auditor broke the proposed solution.`}
+              ${passed
+              ? `<span style="color: var(--emerald); font-weight: 600;">Generator survived!</span> Auditor's challenge was a false positive.`
+              : `<span style="color: var(--rose); font-weight: 600;">Adversarial breakdown!</span> Auditor broke the proposed solution.`}
             </div>
             <div class="io-grid">
               <div class="io-card">
@@ -2377,52 +3910,74 @@
         });
       });
 
-      // 8. Nash Payoff Settlement Completed
-      es.addEventListener('settlement:completed', (e) => {
-        const data = JSON.parse(e.data);
+      function handleSettlementCompleted(data) {
         const { roundNumber, settlement, updatedAgents } = data;
+        if (!roundNumber || settledRounds.has(roundNumber)) {
+          return;
+        }
+        settledRounds.add(roundNumber);
 
         if (updatedAgents) {
           updateAgents(updatedAgents);
+          updatedAgents.forEach((ag) => {
+            if (!capitalHistory[ag.id]) {
+              capitalHistory[ag.id] = [{ round: 0, capital: 100, status: 'ACTIVE' }];
+            }
+            capitalHistory[ag.id].push({
+              round: roundNumber,
+              capital: ag.capital,
+              status: ag.status,
+            });
+          });
         }
 
+        const chartRoundBadge = document.getElementById('chartRoundBadge');
+        if (chartRoundBadge) chartRoundBadge.textContent = `Round ${roundNumber}`;
+        renderCapitalChart();
+
         let transfersHtml = '';
-        
+
         // Pairwise transfers
-        for (const pair of settlement.pairSettlements) {
-          if (!pair.generatorPassed) {
-            transfersHtml += `
-              <div class="transfer-line bounty">
-                <span>🏆 <strong>${pair.auditorId}</strong> awarded bounty</span>
-                <span style="color: var(--emerald); font-weight: 700;">+${pair.generatorStake.toFixed(2)} Capital</span>
-              </div>
-              <div class="transfer-line penalty">
-                <span>🔻 <strong>${pair.generatorId}</strong> forfeited stake</span>
-                <span style="color: var(--rose); font-weight: 700;">-${pair.generatorStake.toFixed(2)} Capital</span>
-              </div>
-            `;
-          } else {
-            transfersHtml += `
-              <div class="transfer-line penalty">
-                <span>⚠️ <strong>${pair.auditorId}</strong> false positive penalty (-1.5x)</span>
-                <span style="color: var(--rose); font-weight: 700;">${pair.auditorDelta.toFixed(2)} Capital</span>
-              </div>
-              <div class="transfer-line bounty">
-                <span>🛡️ <strong>${pair.generatorId}</strong> resilience dividend (+0.5x)</span>
-                <span style="color: var(--emerald); font-weight: 700;">+${pair.generatorDelta.toFixed(2)} Capital</span>
-              </div>
-            `;
+        if (settlement && settlement.pairSettlements) {
+          for (const pair of settlement.pairSettlements) {
+            const stakeVal = pair.generatorStake ?? Math.abs(pair.generatorDelta) ?? 0;
+            if (!pair.generatorPassed) {
+              transfersHtml += `
+                <div class="transfer-line bounty">
+                  <span>🏆 <strong>${pair.auditorId}</strong> awarded bounty</span>
+                  <span style="color: var(--emerald); font-weight: 700;">+${stakeVal.toFixed(2)} Capital</span>
+                </div>
+                <div class="transfer-line penalty">
+                  <span>🔻 <strong>${pair.generatorId}</strong> forfeited stake</span>
+                  <span style="color: var(--rose); font-weight: 700;">-${stakeVal.toFixed(2)} Capital</span>
+                </div>
+              `;
+            } else {
+              transfersHtml += `
+                <div class="transfer-line penalty">
+                  <span>⚠️ <strong>${pair.auditorId}</strong> false positive penalty (-1.5x)</span>
+                  <span style="color: var(--rose); font-weight: 700;">${pair.auditorDelta.toFixed(2)} Capital</span>
+                </div>
+                <div class="transfer-line bounty">
+                  <span>🛡️ <strong>${pair.generatorId}</strong> resilience dividend (+0.5x)</span>
+                  <span style="color: var(--emerald); font-weight: 700;">+${pair.generatorDelta.toFixed(2)} Capital</span>
+                </div>
+              `;
+            }
           }
         }
 
         // Unchallenged dividends
-        for (const unch of settlement.unchallengedSettlements) {
-          transfersHtml += `
-            <div class="transfer-line dividend">
-              <span>✨ <strong>${unch.agentId}</strong> unchallenged solution dividend (+10%)</span>
-              <span style="color: var(--blue); font-weight: 700;">+${unch.delta.toFixed(2)} Capital</span>
-            </div>
-          `;
+        if (settlement && settlement.unchallengedSettlements) {
+          for (const unch of settlement.unchallengedSettlements) {
+            const divVal = unch.dividend ?? unch.delta ?? 0;
+            transfersHtml += `
+              <div class="transfer-line dividend">
+                <span>✨ <strong>${unch.agentId || unch.generatorId}</strong> unchallenged solution dividend (+10%)</span>
+                <span style="color: var(--blue); font-weight: 700;">+${divVal.toFixed(2)} Capital</span>
+              </div>
+            `;
+          }
         }
 
         appendEventCard({
@@ -2436,6 +3991,15 @@
             </div>
           `
         });
+      }
+
+      // 8. Nash Payoff Settlement Completed (Dual SSE listeners for settlement:completed & round:settlement)
+      es.addEventListener('settlement:completed', (e) => {
+        handleSettlementCompleted(JSON.parse(e.data));
+      });
+
+      es.addEventListener('round:settlement', (e) => {
+        handleSettlementCompleted(JSON.parse(e.data));
       });
 
       // 9. Bankruptcy Alert
@@ -2487,6 +4051,11 @@
           `;
         });
 
+        const btnExportJson = document.getElementById('btnExportJson');
+        const btnExportMd = document.getElementById('btnExportMd');
+        if (btnExportJson) { btnExportJson.disabled = false; btnExportJson.style.opacity = '1'; }
+        if (btnExportMd) { btnExportMd.disabled = false; btnExportMd.style.opacity = '1'; }
+
         appendEventCard({
           type: 'tournament-end',
           badgeText: '🏁 Tournament Summary',
@@ -2510,6 +4079,11 @@
             </table>
             <div style="margin-top: 14px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px; font-size: 0.78rem; color: var(--text-muted);">
               <strong>Key Game-Theoretic Takeaway:</strong> Skin-in-the-game prevents cheap-talk hallucinations. Auditors are incentivized to find real edge-cases, while asymmetric penalties deter spam challenges.
+            </div>
+            <div style="margin-top: 14px; display: flex; gap: 0.75rem; align-items: center; justify-content: flex-end; flex-wrap: wrap;">
+              <span style="font-size: 0.8rem; color: var(--text-muted);">Export Arbitration Report:</span>
+              <button class="btn-tool-sm" onclick="downloadReport('json')" style="padding: 0.35rem 0.7rem; font-weight: 600; cursor: pointer;">📥 Download JSON</button>
+              <button class="btn-tool-sm" onclick="downloadReport('markdown')" style="padding: 0.35rem 0.7rem; font-weight: 600; cursor: pointer;">📥 Download Markdown</button>
             </div>
           `
         });
@@ -2551,12 +4125,14 @@
             </div>
             <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 6px;">
               ${data.error && (data.error.includes('credit_balance_exhausted') || data.error.includes('insufficient_quota'))
-                ? '💳 <strong>OpenAI Out of Credits:</strong> Your OpenAI API key has no credit balance remaining ($0.00).<br><br><span style="display:inline-flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;"><button type="button" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 0.78rem; cursor: pointer;" onclick="switchModelAndRun(\'gemini-2.5-flash\')">⚡ Use Google Gemini (Gemini 2.5 Flash)</button><button type="button" style="background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid var(--border-accent); padding: 5px 12px; border-radius: 6px; font-weight: 500; font-size: 0.78rem; cursor: pointer;" onclick="clearKeyAndRunMock()">🧪 Run Offline Mock (Zero Quota)</button></span>'
+              ? '💳 <strong>OpenAI Out of Credits:</strong> Your OpenAI API key has no credit balance remaining ($0.00).<br><br><span style="display:inline-flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;"><button type="button" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 0.78rem; cursor: pointer;" onclick="switchModelAndRun(\'gemini-3.5-flash-lite\')">⚡ Use Google Gemini (Gemini 3.5 Flash-Lite)</button><button type="button" style="background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid var(--border-accent); padding: 5px 12px; border-radius: 6px; font-weight: 500; font-size: 0.78rem; cursor: pointer;" onclick="clearKeyAndRunMock()">🧪 Run Offline Mock (Zero Quota)</button></span>'
+              : data.error && (data.error.includes('Plan Restriction') || data.error.includes('limit: 0') || data.error.includes("limit '0'") || data.error.includes('quota_limit: "0"') || data.error.includes('limit 0'))
+                ? '💳 <strong>Billing Account Required (Pay-As-You-Go):</strong> Google AI Studio assigns a quota of 0 requests/day (<code>limit: 0</code>) to this model on free tier plans. To use this model, link a billing account in Google Cloud.<br><br><span style="display:inline-flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;"><button type="button" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 0.78rem; cursor: pointer;" onclick="switchModelAndRun(\'gemini-3.5-flash-lite\')">⚡ Switch to Gemini 3.5 Flash-Lite (Free Tier)</button><button type="button" style="background: linear-gradient(135deg, #10b981, #0ea5e9); color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 0.78rem; cursor: pointer;" onclick="switchModelAndRun(\'gemini-4-hydrogen\')">⚡ Try Gemini 4 Hydrogen (Free Tier)</button><button type="button" style="background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid var(--border-accent); padding: 5px 12px; border-radius: 6px; font-weight: 500; font-size: 0.78rem; cursor: pointer;" onclick="clearKeyAndRunMock()">🧪 Run Offline Mock</button></span>'
                 : data.error && (data.error.includes('per day limit') || data.error.includes('Quota exceeded') || data.error.includes('RESOURCE_EXHAUSTED'))
-                  ? '🛑 <strong>Google Free Tier Daily Limit Reached:</strong> Google AI Studio limits this preview model on Free Tier.<br><br><span style="display:inline-flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;"><button type="button" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 0.78rem; cursor: pointer;" onclick="switchModelAndRun(\'gemini-2.5-flash\')">⚡ Switch to Gemini 2.5 Flash</button><button type="button" style="background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid var(--border-accent); padding: 5px 12px; border-radius: 6px; font-weight: 500; font-size: 0.78rem; cursor: pointer;" onclick="clearKeyAndRunMock()">🧪 Run Offline Mock (Zero Quota)</button></span>'
-                : data.error && (data.error.includes('503') || data.error.includes('high demand') || data.error.includes('timed out'))
-                  ? '⚡ <strong>High Demand / Capacity Spike:</strong> The upstream model provider is experiencing a surge. You can switch the model or replay.'
-                  : 'Adapter exception was caught and logged. Check endpoint connectivity, API keys, or model availability.'}
+                  ? '🛑 <strong>Daily Free Tier Quota Reached:</strong> The daily request limit for this model has been exceeded.<br><br><span style="display:inline-flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;"><button type="button" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 0.78rem; cursor: pointer;" onclick="switchModelAndRun(\'gemini-3.5-flash-lite\')">⚡ Switch to Gemini 3.5 Flash-Lite (Free Tier)</button><button type="button" style="background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid var(--border-accent); padding: 5px 12px; border-radius: 6px; font-weight: 500; font-size: 0.78rem; cursor: pointer;" onclick="clearKeyAndRunMock()">🧪 Run Offline Mock</button></span>'
+                  : data.error && (data.error.includes('503') || data.error.includes('high demand') || data.error.includes('timed out'))
+                    ? '⚡ <strong>High Demand / Capacity Spike:</strong> The upstream model provider is experiencing a surge. You can switch the model or replay.'
+                    : 'Adapter exception was caught and logged. Check endpoint connectivity, API keys, or model availability.'}
             </p>
           `
         });
@@ -2583,19 +4159,12 @@
 
       // 14. Tournament Reset by User
       es.addEventListener('tournament:reset', (e) => {
-        const thinking = document.getElementById('thinking-card');
-        if (thinking) thinking.remove();
-        setRunningState(false);
-        metricState.textContent = 'STANDBY';
-        metricStateSub.textContent = 'Ready to launch';
-        problemBanner.style.display = 'none';
-        appendEventCard({
-          type: 'reset',
-          badgeText: '⏹ Reset',
-          badgeClass: 'event-badge-fail',
-          title: 'Tournament Aborted & Reset',
-          body: '<p style="color: var(--text-dim);">Tournament was stopped and reset to standby state.</p>'
-        });
+        let resetAgents = null;
+        try {
+          const d = JSON.parse(e.data);
+          if (d && d.agents) resetAgents = d.agents;
+        } catch {}
+        performClientReset(resetAgents);
       });
 
       // 15. Real-Time Agents Roster Updates
@@ -2605,7 +4174,7 @@
           if (data.agents) {
             updateAgents(data.agents);
           }
-        } catch {}
+        } catch (_err) { }
       });
     }
 
@@ -2648,9 +4217,12 @@
         card.id = `card-${agent.id}`;
 
         const savedAgentModel = agentModelOverrides[agent.id] || localStorage.getItem('nashgate_agent_model_' + agent.id);
-        const currentAgentModel = sanitizeModelName(agent.model || savedAgentModel || getGlobalModel());
+        const currentAgentModel = (savedAgentModel || agent.model || getGlobalModel() || '').trim();
         agentModelOverrides[agent.id] = currentAgentModel;
         const hasKey = Boolean(agentKeyOverrides[agent.id] || sessionStorage.getItem('nashgate_key_' + agent.id) || agent.hasDedicatedKey);
+
+        const modelsForThisAgent = agentDiscoveredModels[agent.id] || globalDiscoveredModels || [];
+        const hasModels = modelsForThisAgent.length > 0;
 
         card.innerHTML = `
           <div class="agent-card-header">
@@ -2686,27 +4258,18 @@
               <select
                 id="agent-model-${agent.id}"
                 class="agent-model-select"
-                title="Click to customize model for ${agent.id}"
+                title="Model assigned to ${agent.id} (automatically uses keys from Providers Hub)"
                 onchange="onAgentModelChange('${agent.id}', this.value)"
               >
-                <option value="gemini-3.5-flash-lite" ${currentAgentModel === 'gemini-3.5-flash-lite' ? 'selected' : ''}>gemini-3.5-flash-lite</option>
-                <option value="gemini-1.5-flash" ${currentAgentModel === 'gemini-1.5-flash' ? 'selected' : ''}>gemini-1.5-flash</option>
-                <option value="gemini-2.0-flash" ${currentAgentModel === 'gemini-2.0-flash' ? 'selected' : ''}>gemini-2.0-flash</option>
-                <option value="gemini-3.8-flash" ${currentAgentModel === 'gemini-3.8-flash' ? 'selected' : ''}>gemini-3.8-flash</option>
-                <option value="gpt-4o-mini" ${currentAgentModel === 'gpt-4o-mini' ? 'selected' : ''}>gpt-4o-mini</option>
-                <option value="gpt-4o" ${currentAgentModel === 'gpt-4o' ? 'selected' : ''}>gpt-4o</option>
-                <option value="llama3.2" ${currentAgentModel === 'llama3.2' ? 'selected' : ''}>llama3.2</option>
-                <option value="qwen2.5-coder:7b" ${currentAgentModel === 'qwen2.5-coder:7b' ? 'selected' : ''}>qwen2.5-coder:7b</option>
-                <option value="deepseek-chat" ${currentAgentModel === 'deepseek-chat' ? 'selected' : ''}>deepseek-chat</option>
-                ${!['gemini-3.5-flash-lite','gemini-1.5-flash','gemini-2.0-flash','gemini-3.8-flash','gpt-4o-mini','gpt-4o','llama3.2','qwen2.5-coder:7b','deepseek-chat'].includes(currentAgentModel) ? `<option value="${escapeHtml(currentAgentModel)}" selected>${escapeHtml(currentAgentModel)}</option>` : ''}
+                ${renderGroupedOptions(currentAgentModel)}
               </select>
             </div>
             <button
               class="badge-key ${hasKey ? 'badge-key-active' : 'badge-key-none'}"
               onclick="openAgentKeyModal('${escapeHtml(agent.id)}')"
-              title="Configure dedicated API key & base URL for ${agent.id}"
+              title="Optional advanced override (custom key or endpoint for ${agent.id})"
             >
-              ${hasKey ? '🔑 Key Set' : '+ Key'}
+              ${hasKey ? '🔑 Custom Key' : '+ Key'}
             </button>
           </div>
 
@@ -2785,16 +4348,31 @@
       metricOracleSub.textContent = `${oraclePassedCount} passed / ${oracleFailedCount} failed`;
     }
 
+    function toggleTournamentAction() {
+      if (isRunning) {
+        triggerResetTournament();
+      } else {
+        triggerTournament();
+      }
+    }
+
     function setRunningState(running) {
       isRunning = running;
+      const startBtn = document.getElementById('startBtn');
       if (running) {
-        startBtn.disabled = true;
-        startBtnText.textContent = 'Tournament in Progress...';
-        startBtn.innerHTML = '<span class="spinner"></span> <span>Running Tournament...</span>';
+        if (startBtn) {
+          startBtn.disabled = false;
+          startBtn.className = 'btn-start btn-stop';
+          startBtn.title = 'Click to halt simulation immediately';
+          startBtn.innerHTML = '<span>⏹</span> <span id="startBtnText">Stop Simulation</span>';
+        }
       } else {
-        startBtn.disabled = false;
-        startBtnText.textContent = 'Replay Tournament';
-        startBtn.innerHTML = '<span>↻</span> <span>Replay Tournament</span>';
+        if (startBtn) {
+          startBtn.disabled = false;
+          startBtn.className = 'btn-start';
+          startBtn.title = 'Start consensus tournament';
+          startBtn.innerHTML = '<span id="startBtnIcon">▶</span> <span id="startBtnText">Start Tournament</span>';
+        }
       }
     }
 
@@ -2804,48 +4382,94 @@
     async function triggerTournament() {
       if (isRunning) return;
 
-      setRunningState(true);
-
-      const modelSel = document.getElementById('modelSelect');
-      const customInput = document.getElementById('customModelInput');
-      let rawModel = modelSel?.value === '__custom__'
-        ? customInput?.value?.trim()
-        : modelSel?.value?.trim();
-      const modelVal = rawModel ? sanitizeModelName(rawModel) : 'gemini-3.5-flash-lite';
-      localStorage.setItem('nashgate_selected_model', modelVal);
-
-      // Build complete per-agent specifications with individual models, roles, and API keys
-      const agentsPayload = agentsState.map((a) => {
-        const savedModel = agentModelOverrides[a.id] || localStorage.getItem('nashgate_agent_model_' + a.id);
-        const m = sanitizeModelName(a.model || savedModel || modelVal);
-        const k = agentKeyOverrides[a.id] || sessionStorage.getItem('nashgate_key_' + a.id) || undefined;
-        const u = agentUrlOverrides[a.id] || sessionStorage.getItem('nashgate_url_' + a.id) || a.baseUrl || undefined;
-        return {
-          id: a.id,
-          role: a.role,
-          model: m,
-          capital: a.capital,
-          apiKey: k,
-          baseUrl: u,
-        };
-      });
-
-      const sanitizedAgentOverrides = {};
-      for (const a of agentsPayload) {
-        if (a.model) {
-          sanitizedAgentOverrides[a.id] = a.model;
-        }
-      }
-
-      const payload = {
-        model: modelVal || undefined,
-        agentModels: Object.keys(sanitizedAgentOverrides).length > 0 ? sanitizedAgentOverrides : undefined,
-        apiKey: sessionKey || undefined,
-        rounds: roundsVal,
-        agents: agentsPayload.length > 0 ? agentsPayload : undefined,
-      };
-
       try {
+        setRunningState(true);
+
+        const modelSel = document.getElementById('modelSelect');
+        const customInput = document.getElementById('customModelInput');
+        let rawModel = modelSel?.value === '__custom__'
+          ? customInput?.value?.trim()
+          : modelSel?.value?.trim();
+        const modelVal = rawModel || getGlobalModel();
+        if (modelVal) {
+          localStorage.setItem('nashgate_selected_model', modelVal);
+        }
+
+        const apikeyInputEl = document.getElementById('apikeyInput');
+        const sessionKey = getSessionApiKey() || apikeyInputEl?.value?.trim() || undefined;
+
+        const isMockModel = !modelVal || modelVal.startsWith('mock-');
+        const hasAnyProvider = Boolean(
+          providerKeysState.gemini ||
+          providerKeysState.openai ||
+          providerCatalog.ollama.length > 0 ||
+          sessionKey
+        );
+
+        if (!isMockModel && !hasAnyProvider && globalDiscoveredProvider !== 'ollama') {
+          alert('Please configure your credentials in 🔑 Providers Hub (or select an 🧪 Offline model) before starting the tournament.');
+          setRunningState(false);
+          return;
+        }
+
+        const roundsSelectEl = document.getElementById('roundsSelect');
+        const roundsVal = roundsSelectEl ? parseInt(roundsSelectEl.value, 10) || 3 : 3;
+
+        // Build complete per-agent specifications with individual models, roles, and API keys
+        const agentsPayload = agentsState.map((a) => {
+          const savedModel = agentModelOverrides[a.id] || localStorage.getItem('nashgate_agent_model_' + a.id);
+          const m = (agentModelOverrides[a.id] || savedModel || a.model || modelVal || '').trim();
+          const isCloud = m.startsWith('gemini-') || m.startsWith('gpt-') || m.startsWith('o1') || m.startsWith('o3');
+
+          const k = agentKeyOverrides[a.id] || sessionStorage.getItem('nashgate_key_' + a.id) || undefined;
+          let u = agentUrlOverrides[a.id] || sessionStorage.getItem('nashgate_url_' + a.id) || a.baseUrl || undefined;
+          if (isCloud && u && u.includes('11434')) {
+            u = undefined;
+            delete agentUrlOverrides[a.id];
+            sessionStorage.removeItem('nashgate_url_' + a.id);
+            a.baseUrl = undefined;
+          }
+
+          return {
+            id: a.id,
+            role: a.role,
+            model: m || modelVal,
+            capital: a.capital,
+            apiKey: k,
+            baseUrl: u,
+          };
+        });
+
+        const sanitizedAgentOverrides = {};
+        for (const a of agentsPayload) {
+          if (a.model) {
+            sanitizedAgentOverrides[a.id] = a.model;
+          }
+        }
+
+        const isSelectedOllama = Boolean(
+          modelVal && (
+            modelVal.includes(':') ||
+            modelVal.toLowerCase().includes('qwen') ||
+            modelVal.toLowerCase().includes('llama') ||
+            modelVal.toLowerCase().includes('deepseek')
+          )
+        );
+
+        const payload = {
+          model: modelVal || undefined,
+          agentModels: Object.keys(sanitizedAgentOverrides).length > 0 ? sanitizedAgentOverrides : undefined,
+          apiKey: sessionKey,
+          providerKeys: {
+            gemini: providerKeysState.gemini || undefined,
+            openai: providerKeysState.openai || undefined,
+          },
+          provider: isSelectedOllama ? 'ollama' : (modelVal?.startsWith('gemini-') ? 'gemini' : (modelVal?.startsWith('gpt-') ? 'openai' : undefined)),
+          baseUrl: isSelectedOllama ? 'http://127.0.0.1:11434/v1' : undefined,
+          rounds: roundsVal,
+          agents: agentsPayload.length > 0 ? agentsPayload : undefined,
+        };
+
         const res = await fetch('/api/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2858,23 +4482,83 @@
           setRunningState(false);
         }
       } catch (err) {
-        alert(`Network error starting tournament: ${err.message}`);
+        alert(`Error starting tournament: ${err.message}`);
         setRunningState(false);
       }
+    }
+
+    function performClientReset(agents) {
+      // 1. Halt thinking indicator and stop running state
+      const thinking = document.getElementById('thinking-card');
+      if (thinking) thinking.remove();
+      setRunningState(false);
+
+      // 2. Reset round and history tracking
+      currentRound = 0;
+      settledRounds.clear();
+      oraclePassedCount = 0;
+      oracleFailedCount = 0;
+      updateOracleMetrics();
+
+      // 3. Normalize reset agents to $100 baseline
+      let resetAgents = agents;
+      if (!resetAgents || !Array.isArray(resetAgents) || resetAgents.length === 0) {
+        resetAgents = (agentsState && agentsState.length > 0 ? agentsState : [
+          { id: 'AlphaGen', role: 'GENERATOR', capital: 100, status: 'ACTIVE' },
+          { id: 'BuggyGen', role: 'GENERATOR', capital: 100, status: 'ACTIVE' },
+          { id: 'SharpAuditor', role: 'AUDITOR', capital: 100, status: 'ACTIVE' },
+          { id: 'RecklessAuditor', role: 'AUDITOR', capital: 100, status: 'ACTIVE' }
+        ]).map(a => ({ ...a, capital: 100, status: 'ACTIVE' }));
+      } else {
+        resetAgents = resetAgents.map(a => ({
+          ...a,
+          capital: typeof a.capital === 'number' && a.capital > 0 ? a.capital : 100,
+          status: 'ACTIVE'
+        }));
+      }
+
+      // 4. Update agents in UI and capital chart history
+      updateAgents(resetAgents);
+      initCapitalHistory(resetAgents);
+
+      // 5. Reset all metrics
+      metricState.textContent = 'STANDBY';
+      metricStateSub.textContent = 'Ready to launch';
+      const totalEconomy = resetAgents.reduce((acc, a) => acc + (a.capital || 0), 0);
+      metricEconomy.textContent = totalEconomy.toFixed(2);
+      const activeSolvent = resetAgents.filter(a => a.status === 'ACTIVE' && a.capital > 0).length;
+      metricSolvent.textContent = `${activeSolvent} / ${resetAgents.length}`;
+
+      // 6. Reset chart round badge & problem banner
+      const chartRoundBadge = document.getElementById('chartRoundBadge');
+      if (chartRoundBadge) chartRoundBadge.textContent = 'Round 0';
+      if (problemBanner) problemBanner.style.display = 'none';
+
+      // 7. Clear event cards in feed and restore standby empty state
+      clearFeed();
+      eventsContainer.innerHTML = `
+        <div id="emptyFeedState" class="empty-state">
+          <div class="empty-icon">⚡</div>
+          <div style="font-weight: 600; color: #fff;">Consensus Engine Ready</div>
+          <div>Click <strong>Start Tournament</strong> to observe multi-agent proposals, adversarial audits, sandbox executions, and Nash settlements live.</div>
+        </div>
+      `;
+
+      // 8. Reset export buttons
+      const btnExportJson = document.getElementById('btnExportJson');
+      const btnExportMd = document.getElementById('btnExportMd');
+      if (btnExportJson) { btnExportJson.disabled = true; btnExportJson.style.opacity = '0.5'; }
+      if (btnExportMd) { btnExportMd.disabled = true; btnExportMd.style.opacity = '0.5'; }
     }
 
     async function triggerResetTournament() {
       try {
         const res = await fetch('/api/reset', { method: 'POST' });
         const data = await res.json();
-        const thinking = document.getElementById('thinking-card');
-        if (thinking) thinking.remove();
-        setRunningState(false);
-        metricState.textContent = 'STANDBY';
-        metricStateSub.textContent = 'Ready to launch';
-        problemBanner.style.display = 'none';
+        performClientReset(data?.agents);
       } catch (err) {
-        alert(`Failed to reset tournament: ${err.message}`);
+        console.warn('Network error during reset, forcing local reset:', err);
+        performClientReset();
       }
     }
 
@@ -2888,28 +4572,54 @@
         .replace(/'/g, '&#039;');
     }
 
-    // Initialize EventSource on page load & sanitize cached model
+    // Initialize EventSource & Providers Hub on page load
     window.addEventListener('DOMContentLoaded', () => {
-      let savedModel = localStorage.getItem('nashgate_selected_model') || 'gemini-3.5-flash-lite';
-      if (savedModel.startsWith('gemini-2.5')) {
-        savedModel = 'gemini-3.5-flash-lite';
-      }
-      setModelSelectorValue(savedModel);
-
-      // Restore API key from sessionStorage if present
-      const apikeyEl = document.getElementById('apikeyInput');
-      const statusEl = document.getElementById('apikeyStatus');
-      const savedKey = sessionStorage.getItem('nashgate_api_key');
-      if (savedKey && apikeyEl) {
-        apikeyEl.value = savedKey;
-        if (statusEl) {
-          statusEl.textContent = '✓ Key set for this session';
-          statusEl.className = 'apikey-status set';
+      // Migrate legacy key from sessionStorage if present
+      const legacyKey = sessionStorage.getItem('nashgate_api_key');
+      if (legacyKey) {
+        if ((legacyKey.startsWith('AIza') || legacyKey.startsWith('AQ.')) && !providerKeysState.gemini) {
+          providerKeysState.gemini = legacyKey;
+          localStorage.setItem('nashgate_key_gemini', legacyKey);
+        } else if (legacyKey.startsWith('sk-') && !providerKeysState.openai) {
+          providerKeysState.openai = legacyKey;
+          localStorage.setItem('nashgate_key_openai', legacyKey);
         }
       }
+
+      // Check configured providers
+      if (providerKeysState.gemini) {
+        verifyGeminiKey(providerKeysState.gemini, false);
+      }
+      if (providerKeysState.openai) {
+        verifyOpenAiKey(providerKeysState.openai, false);
+      }
+      detectOllamaModels(false);
+
+      // Populate selects and pill count immediately
+      populateAllModelSelects();
+      updateProvidersHeaderPill();
+
+      // Immediate fetch of initial state & agents so UI renders without waiting on SSE
+      fetch('/api/status')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.agents && data.agents.length > 0) {
+            updateAgents(data.agents);
+            initCapitalHistory(data.agents);
+          }
+          if (data && data.totalProblems) {
+            totalProblemsCount = data.totalProblems;
+            syncRoundsSelect(data.totalProblems);
+          }
+          if (data && typeof data.isRunning === 'boolean') {
+            setRunningState(data.isRunning);
+          }
+        })
+        .catch((_err) => { });
 
       initEventSource();
     });
   </script>
 </body>
+
 </html>

@@ -24,6 +24,12 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Install Development Dependencies
+        run: npm ci
+
+      - name: Run Typecheck
+        run: npm run typecheck
+
       - name: Run Test Suite
         run: npm test
 

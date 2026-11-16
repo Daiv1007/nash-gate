@@ -1,10 +1,14 @@
+<p align="center">
+  <img src="assets/logo_nash-gate.png" alt="NashGate Logo" width="460" />
+</p>
+
 # NashGate 🏛️⚡
 
 > **A deterministic consensus and arbitration engine for multi-agent AI systems, grounded in Game Theory and Mechanism Design.**
 
 ![NashGate Real-Time Consensus Dashboard](assets/nash-gate-demo.gif)
 
-[![Tests](https://img.shields.io/badge/tests-131%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-194%20passing-brightgreen.svg)](tests/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Dependencies](https://img.shields.io/badge/dependencies-zero-success.svg)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-black.svg)](package.json)
@@ -106,7 +110,7 @@ git clone https://github.com/Daiv1007/nash-gate.git
 cd nash-gate
 npm test
 ```
-All 131 unit, oracle, adapter, settlement, and server tests will run with sub-second execution.
+All 194 unit, oracle, adapter, settlement, and server tests will run with sub-second execution.
 
 ### 2. Interactive CLI Demo
 
@@ -166,17 +170,16 @@ Open `http://localhost:3000` in any browser to watch:
 
 NashGate supports live multi-model execution via `OpenAICompatibleAdapter` with zero third-party SDK dependencies (powered by Node native `fetch`).
 
-### Inserting Your API Key
+### Configuring Providers & Keys
 
-There are two equally valid ways to provide your API key:
+There are three flexible ways to provide API credentials:
 
-**Option A — Paste in the Web UI (easiest):**
+**Option A — AI Providers Hub in Web UI (Recommended):**
 1. Run `npm run ui` (no environment variable required).
 2. Open `http://localhost:3000` in your browser.
-3. Paste your key into the **API Key** field in the top header bar (👁 to reveal/mask it).
-4. Type your model name (e.g. `gemini-3.8-flash`) and click **Start Tournament**.
-
-The key is stored only in your browser's `sessionStorage` — it disappears when you close the tab and is never written to disk or logs.
+3. Click the **🔑 Providers** pill in the top header bar.
+4. Configure your keys once (Google Gemini, OpenAI, or 1-click Ollama local detection).
+5. All agents automatically inherit credentials based on the model assigned to them, with zero manual per-agent setup needed.
 
 **Option B — Environment variable (for scripts / CI):**
 ```powershell
@@ -186,19 +189,27 @@ $env:LLM_API_KEY = "AQ.YourGeminiKey"
 $env:LLM_API_KEY = "sk-proj-YourOpenAIKey"
 npm run ui
 # or:
-npm run demo -- --model=gemini-3.8-flash
+npm run demo -- --model=gemini-3.5-flash-lite
 ```
 
-Both methods work simultaneously — if a key is pasted in the UI, it takes priority over the environment variable for that tournament run.
+**Option C — Granular Per-Agent Keys:**
+Click the key badge (`🔑`) on any individual agent card to assign a dedicated API key or custom endpoint specifically to that agent.
 
-### Freedom of Model Selection
+### Freedom of Model Selection & Tier Transparency
 Users are not locked into any default models. You have total freedom to specify:
 1. **In the Web Visualizer (`npm run ui`)**:
-   - **Header Model Selector**: Type or select any model name (`gemini-3.8-flash`, `gpt-4o`, `llama3.2`, `qwen2.5-coder:7b`, `deepseek-chat`, etc.) to apply globally across all agents.
-   - **Per-Agent Model Inputs**: Click on any agent card in the left panel to assign different models to individual agents (e.g. `AlphaGen` on `gemini-3.8-flash`, `BuggyGen` on `gpt-4o-mini`, `SharpAuditor` on `llama3.2`).
+   - **Per-Agent Model Selectors**: Configure models directly on each agent card, organized cleanly by tiers:
+     - 🌟 **Google Gemini — Free Tier OK:** `gemini-3.5-flash-lite` (fastest & highest quota), `gemini-4-hydrogen`, `gemini-3.1-flash-lite`, `gemini-3.6-flash`.
+     - 💼 **Google Gemini — Billing Required (Pay-As-You-Go):** `gemini-4-carbon`, `gemini-4-argon`, `gemini-3.1-pro-preview`, `gemini-pro-latest`.
+     - ⚡ **Google Gemini — Previews (High Upstream Demand):** `gemini-3.8-flash`, `gemini-3.7-flash`.
+     - 🦙 **Ollama Local (100% Offline / Zero Quota):** Models detected on your local machine.
+     - 🤖 **OpenAI:** `gpt-4o`, `gpt-4o-mini`, `o3-mini`.
+     - 🧪 **Offline Simulation:** Pure algorithmic game-theoretic benchmarks.
+   - **Providers Hub**: Click **🔑 Providers** in the header to test, verify, and store credentials for Gemini, OpenAI, and Ollama in one place.
+   - **Per-Agent Model Inputs**: Click on any agent card to assign different models to individual agents (e.g. `AlphaGen` on `gemini-3.5-flash-lite`, `BuggyGen` on `gpt-4o-mini`, `SharpAuditor` on `llama3.2`).
 2. **In the Interactive CLI (`npm run demo`)**:
-   - Global model flag: `npm run demo -- --model=gemini-3.8-flash`
-   - Per-agent flags: `npm run demo -- --alpha-model=gpt-4o --sharp-model=gemini-3.8-flash --reckless-model=llama3.2`
+   - Global model flag: `npm run demo -- --model=gemini-3.5-flash-lite`
+   - Per-agent flags: `npm run demo -- --alpha-model=gpt-4o --sharp-model=gemini-3.5-flash-lite --reckless-model=llama3.2`
    - Run `npm run demo -- --help` for full options.
 3. **Via Environment Variable**:
    - `export LLM_MODEL="<your-model>"`
@@ -217,11 +228,11 @@ NashGate allows complete customization of the competing multi-agent economy:
 ### Dynamic Model Resolution & Auto-Normalization
 When no custom model is explicitly specified, the engine discovers your target provider and default model:
 1. `LLM_MODEL`: Exact model name override.
-2. `LLM_API_KEY` starting with `AIza` or `AQ.` (Google AI Studio formats): Defaults to `gemini-3.8-flash` and routes to Google's OpenAI-compatible endpoint (`https://generativelanguage.googleapis.com/v1beta/openai`).
+2. `LLM_API_KEY` starting with `AIza` or `AQ.` (Google AI Studio formats): Defaults to `gemini-3.5-flash-lite` and routes to Google's OpenAI-compatible endpoint (`https://generativelanguage.googleapis.com/v1beta/openai`).
 3. `LLM_BASE_URL` containing `11434` (Ollama): Defaults to `llama3.2` and routes to local Ollama (`http://localhost:11434/v1`).
 4. Fallback: Defaults to `gpt-4o-mini` (`https://api.openai.com/v1`).
 
-> **Automatic Model Normalization:** Deprecated model names (such as Google's retired `gemini-2.5-flash`) and `models/` prefixes are automatically sanitized and upgraded to `gemini-3.8-flash` at both client and server boundaries, preventing 404 HTTP errors.
+> **Automatic Model Normalization & Tier Protection:** Deprecated model names (such as Google's retired `gemini-2.0-flash` or `gemini-2.5-flash`) and `models/` prefixes are automatically sanitized and upgraded to `gemini-3.5-flash-lite`. When an agent on a Free Tier key attempts to call a paid model, the system immediately catches the `limit: 0` restriction without wasting time on futile retries.
 
 ### Provider Examples
 
@@ -273,9 +284,11 @@ When live credentials are omitted, NashGate operates in **100% deterministic off
 
 ```
 nash-gate/
+├── assets/                    # Project brand logos and visualizer demo recording
 ├── src/
 │   ├── core/                  # Pure game-theoretic logic (100% deterministic, zero I/O)
 │   │   ├── types.ts           # Core domain interfaces (Agent, Proposal, Challenge)
+│   │   ├── staking.ts         # Dynamic Kelly criterion stake sizing & risk aversion
 │   │   ├── validation.ts      # Collateral and stake range verifiers
 │   │   ├── settlement.ts      # Pairwise and unchallenged Nash payoff equations
 │   │   └── bankruptcy.ts      # Capital liquidation and solvency filters
@@ -293,7 +306,10 @@ nash-gate/
 │   │   └── public/
 │   │       └── index.html     # Dark-mode reactive single-page dashboard
 │   └── demo.ts                # Terminal CLI demonstration
-├── tests/                     # 131 unit and integration tests
+├── tests/                     # 194 unit, integration, and security tests
+├── CONTRIBUTING.md            # Guidelines for open-source contributions
+├── CODE_OF_CONDUCT.md         # Contributor Covenant Code of Conduct v2.1
+├── SECURITY.md                # Security policy & responsible disclosure
 ├── SPEC.md                    # Technical specification v0.1
 ├── AGENTS.md                  # Development principles & engineering rules
 └── package.json

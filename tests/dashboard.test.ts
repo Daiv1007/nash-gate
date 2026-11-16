@@ -27,11 +27,19 @@ describe('DashboardServer & Web Visualizer', () => {
     assert.equal(sharp.status, 'ACTIVE');
   });
 
-  it('tournamentProblems contains 3 standard consensus benchmark problems', () => {
-    assert.equal(tournamentProblems.length, 3);
+  it('tournamentProblems contains expanded benchmark problems (at least 8 problems)', () => {
+    assert.ok(tournamentProblems.length >= 8);
+    assert.equal(tournamentProblems.length, 10);
     assert.equal(tournamentProblems[0].id, 'is-palindrome');
     assert.equal(tournamentProblems[1].id, 'clamp-number');
     assert.equal(tournamentProblems[2].id, 'sum-array');
+    assert.equal(tournamentProblems[3].id, 'is-valid-parentheses');
+    assert.equal(tournamentProblems[4].id, 'two-sum');
+    assert.equal(tournamentProblems[5].id, 'flatten-array');
+    assert.equal(tournamentProblems[6].id, 'fibonacci');
+    assert.equal(tournamentProblems[7].id, 'anagram-check');
+    assert.equal(tournamentProblems[8].id, 'chunk-array');
+    assert.equal(tournamentProblems[9].id, 'find-duplicates');
     for (const p of tournamentProblems) {
       assert.ok(p.title);
       assert.ok(p.task);
@@ -40,14 +48,24 @@ describe('DashboardServer & Web Visualizer', () => {
   });
 
   it('DashboardServer exposes initial state snapshot', () => {
-    const server = new DashboardServer({ paceMs: 10 });
-    const snapshot = server.getStateSnapshot();
+    const origKey = process.env.LLM_API_KEY;
+    const origGemini = process.env.GEMINI_API_KEY;
+    delete process.env.LLM_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    try {
+      const server = new DashboardServer({ paceMs: 10 });
+      const snapshot = server.getStateSnapshot();
 
-    assert.equal(snapshot.isRunning, false);
-    assert.equal(snapshot.agents.length, 4);
-    assert.equal(snapshot.totalProblems, 3);
-    assert.equal(snapshot.adapterMode, 'offline-mock');
-    assert.equal(snapshot.connectedClients, 0);
+      assert.equal(snapshot.isRunning, false);
+      assert.equal(snapshot.agents.length, 4);
+      assert.ok(snapshot.totalProblems >= 8);
+      assert.equal(snapshot.totalProblems, 10);
+      assert.equal(snapshot.adapterMode, 'offline-mock');
+      assert.equal(snapshot.connectedClients, 0);
+    } finally {
+      if (origKey !== undefined) process.env.LLM_API_KEY = origKey;
+      if (origGemini !== undefined) process.env.GEMINI_API_KEY = origGemini;
+    }
   });
 
   it('DashboardServer broadcast writes SSE formatted event stream', () => {
@@ -101,18 +119,19 @@ describe('DashboardServer & Web Visualizer', () => {
     mockReqHtml.headers = { host: 'localhost:3000' };
 
     const mockResHtml: any = new EventEmitter();
-    mockResHtml.writeHead = (status: number, headers: any) => {
-      htmlStatus = status;
-      htmlHeaders = headers;
-    };
-    mockResHtml.end = (content: string) => {
-      htmlContent = content;
-    };
+    const htmlPromise = new Promise<void>((resolve) => {
+      mockResHtml.writeHead = (status: number, headers: any) => {
+        htmlStatus = status;
+        htmlHeaders = headers;
+      };
+      mockResHtml.end = (content: string) => {
+        htmlContent = content;
+        resolve();
+      };
+    });
 
     (server as any).handleRequest(mockReqHtml, mockResHtml);
-
-    // Wait microtask for fs.readFile
-    await new Promise((r) => setTimeout(r, 50));
+    await htmlPromise;
     assert.equal(htmlStatus, 200);
     assert.ok(htmlHeaders['Content-Type'].includes('text/html'));
     assert.ok(htmlContent.includes('NASHGATE'));
@@ -161,7 +180,7 @@ describe('DashboardServer & Web Visualizer', () => {
     const snapshot = server.getStateSnapshot();
     assert.equal(snapshot.isRunning, false);
     assert.ok(snapshot.lastResult);
-    assert.equal(snapshot.lastResult.totalRoundsPlayed, 3);
+    assert.equal(snapshot.lastResult.totalRoundsPlayed, 10);
   });
 
   it('DashboardServer handleRequest accepts JSON body with custom model on POST /api/start', async () => {
@@ -485,5 +504,269 @@ describe('DashboardServer & Web Visualizer', () => {
 
     assert.equal(startRes.started, false);
     assert.ok(startRes.reason?.includes('AUDITOR'), 'Should reject roster without auditors');
+  });
+
+  it('DashboardServer exposes GET /api/problems returning active catalog', async () => {
+    const server = new DashboardServer({ paceMs: 1 });
+    let statusCode = 0;
+    let responseBody = '';
+
+    const mockReq: any = new EventEmitter();
+    mockReq.url = '/api/problems';
+    mockReq.method = 'GET';
+    mockReq.headers = { host: 'localhost:3000' };
+
+    const mockRes: any = new EventEmitter();
+    mockRes.writeHead = (code: number) => {
+      statusCode = code;
+    };
+    mockRes.end = (content: string) => {
+      responseBody = content;
+    };
+
+    (server as any).handleRequest(mockReq, mockRes);
+
+    assert.equal(statusCode, 200);
+    const parsed = JSON.parse(responseBody);
+    assert.equal(parsed.ok, true);
+    assert.ok(parsed.total >= 8);
+    assert.equal(parsed.total, 10);
+    assert.equal(parsed.problems.length, 10);
+  });
+
+  it('DashboardServer handles POST /api/problems with validation and mock registration', async () => {
+    const server = new DashboardServer({ paceMs: 1 });
+    let statusCode = 0;
+    let responseBody = '';
+
+    const mockReq: any = new EventEmitter();
+    mockReq.url = '/api/problems';
+    mockReq.method = 'POST';
+    mockReq.headers = { host: 'localhost:3000', 'content-type': 'application/json' };
+
+    const mockRes: any = new EventEmitter();
+    mockRes.writeHead = (code: number) => {
+      statusCode = code;
+    };
+    mockRes.end = (content: string) => {
+      responseBody = content;
+    };
+
+    (server as any).handleRequest(mockReq, mockRes);
+
+    // Valid problem payload
+    mockReq.emit(
+      'data',
+      JSON.stringify({
+        id: 'custom-reverse-string',
+        title: 'Reverse String',
+        task: 'Implement reverseString(s: string): string',
+        entrypoint: 'reverseString',
+        mock: {
+          solid: {
+            solution: 'function reverseString(s) { return String(s).split("").reverse().join(""); }',
+            defaultStakePercent: 0.3,
+          },
+        },
+      })
+    );
+    mockReq.emit('end');
+
+    assert.equal(statusCode, 201);
+    const parsed = JSON.parse(responseBody);
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.problem.id, 'custom-reverse-string');
+    assert.equal(parsed.totalProblems, 11);
+
+    // Verify GET /api/problems reflects newly added problem
+    let getBody = '';
+    const mockResGet: any = new EventEmitter();
+    mockResGet.writeHead = () => {};
+    mockResGet.end = (c: string) => {
+      getBody = c;
+    };
+    const mockReqGet: any = new EventEmitter();
+    mockReqGet.url = '/api/problems';
+    mockReqGet.method = 'GET';
+    mockReqGet.headers = { host: 'localhost:3000' };
+    (server as any).handleRequest(mockReqGet, mockResGet);
+
+    const parsedGet = JSON.parse(getBody);
+    assert.equal(parsedGet.total, 11);
+    assert.ok(parsedGet.problems.some((p: any) => p.id === 'custom-reverse-string'));
+  });
+
+  it('DashboardServer rejects POST /api/problems with invalid schema or duplicate id', async () => {
+    const server = new DashboardServer({ paceMs: 1 });
+
+    // 1. Missing required task
+    let status1 = 0;
+    let body1 = '';
+    const mockReq1: any = new EventEmitter();
+    mockReq1.url = '/api/problems';
+    mockReq1.method = 'POST';
+    mockReq1.headers = { host: 'localhost:3000' };
+    const mockRes1: any = new EventEmitter();
+    mockRes1.writeHead = (c: number) => {
+      status1 = c;
+    };
+    mockRes1.end = (content: string) => {
+      body1 = content;
+    };
+    (server as any).handleRequest(mockReq1, mockRes1);
+    mockReq1.emit('data', JSON.stringify({ id: 'bad-problem', title: 'Bad' }));
+    mockReq1.emit('end');
+
+    assert.equal(status1, 400);
+    assert.equal(JSON.parse(body1).ok, false);
+
+    // 2. Duplicate id with existing problem
+    let status2 = 0;
+    let body2 = '';
+    const mockReq2: any = new EventEmitter();
+    mockReq2.url = '/api/problems';
+    mockReq2.method = 'POST';
+    mockReq2.headers = { host: 'localhost:3000' };
+    const mockRes2: any = new EventEmitter();
+    mockRes2.writeHead = (c: number) => {
+      status2 = c;
+    };
+    mockRes2.end = (content: string) => {
+      body2 = content;
+    };
+    (server as any).handleRequest(mockReq2, mockRes2);
+    mockReq2.emit(
+      'data',
+      JSON.stringify({ id: 'is-palindrome', title: 'Duplicate', task: 'Task' })
+    );
+    mockReq2.emit('end');
+
+    assert.equal(status2, 400);
+    assert.match(JSON.parse(body2).error, /already exists/);
+  });
+
+  it('DashboardServer exports arbitration report in JSON and Markdown formats', async () => {
+    const server = new DashboardServer({ paceMs: 1 });
+
+    // Before tournament: GET /api/report returns 400
+    let preStatus = 0;
+    let preBody = '';
+    const mockPreReq: any = new EventEmitter();
+    mockPreReq.url = '/api/report';
+    mockPreReq.method = 'GET';
+    mockPreReq.headers = { host: 'localhost:3000' };
+    const mockPreRes: any = new EventEmitter();
+    mockPreRes.writeHead = (c: number) => {
+      preStatus = c;
+    };
+    mockPreRes.end = (content: string) => {
+      preBody = content;
+    };
+    (server as any).handleRequest(mockPreReq, mockPreRes);
+
+    assert.equal(preStatus, 400);
+    assert.equal(JSON.parse(preBody).ok, false);
+
+    // Run short 1-round tournament
+    await server.startTournament({ rounds: 1 });
+    const start = Date.now();
+    while (server.getStateSnapshot().isRunning && Date.now() - start < 3000) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+
+    // 1. GET /api/report?format=json
+    let jsonStatus = 0;
+    let jsonBody = '';
+    let jsonHeaders: any = {};
+    const mockJsonReq: any = new EventEmitter();
+    mockJsonReq.url = '/api/report?format=json';
+    mockJsonReq.method = 'GET';
+    mockJsonReq.headers = { host: 'localhost:3000' };
+    const mockJsonRes: any = new EventEmitter();
+    mockJsonRes.writeHead = (c: number, headers: any) => {
+      jsonStatus = c;
+      jsonHeaders = headers;
+    };
+    mockJsonRes.end = (content: string) => {
+      jsonBody = content;
+    };
+    (server as any).handleRequest(mockJsonReq, mockJsonRes);
+
+    assert.equal(jsonStatus, 200);
+    assert.match(jsonHeaders['Content-Type'], /application\/json/);
+    assert.match(jsonHeaders['Content-Disposition'], /attachment.*\.json/);
+    const parsedJsonReport = JSON.parse(jsonBody);
+    assert.ok(parsedJsonReport.leaderboard.length >= 2);
+    assert.ok(parsedJsonReport.rounds.length >= 1);
+    assert.ok(parsedJsonReport.metadata.engine.includes('NashGate'));
+
+    // 2. GET /api/report?format=markdown
+    let mdStatus = 0;
+    let mdBody = '';
+    let mdHeaders: any = {};
+    const mockMdReq: any = new EventEmitter();
+    mockMdReq.url = '/api/report?format=markdown';
+    mockMdReq.method = 'GET';
+    mockMdReq.headers = { host: 'localhost:3000' };
+    const mockMdRes: any = new EventEmitter();
+    mockMdRes.writeHead = (c: number, headers: any) => {
+      mdStatus = c;
+      mdHeaders = headers;
+    };
+    mockMdRes.end = (content: string) => {
+      mdBody = content;
+    };
+    (server as any).handleRequest(mockMdReq, mockMdRes);
+
+    assert.equal(mdStatus, 200);
+    assert.match(mdHeaders['Content-Type'], /text\/markdown/);
+    assert.match(mdHeaders['Content-Disposition'], /attachment.*\.md/);
+    assert.ok(mdBody.includes('# NashGate Arbitration & Consensus Report'));
+    assert.ok(mdBody.includes('Final Leaderboard & ROI Analysis'));
+    assert.ok(mdBody.includes('Round-by-Round Arbitration Audit'));
+  });
+
+  it('DashboardServer blocks path traversal attacks on /assets/ with 403 Forbidden', () => {
+    const server = new DashboardServer({ paceMs: 1 });
+    let status = 0;
+    let body = '';
+    const mockReq: any = new EventEmitter();
+    mockReq.url = '/assets/../../package.json';
+    mockReq.method = 'GET';
+    mockReq.headers = { host: 'localhost:3000' };
+    const mockRes: any = new EventEmitter();
+    mockRes.writeHead = (c: number) => {
+      status = c;
+    };
+    mockRes.end = (content: string) => {
+      body = content;
+    };
+    (server as any).handleRequest(mockReq, mockRes);
+
+    assert.equal(status, 403);
+    assert.ok(body.includes('Access denied'));
+  });
+
+  it('DashboardServer blocks SSRF attacks on /api/models/discover with 403 Forbidden', (t, done) => {
+    const server = new DashboardServer({ paceMs: 1 });
+    let status = 0;
+    let body = '';
+    const mockReq: any = new EventEmitter();
+    mockReq.url = '/api/models/discover';
+    mockReq.method = 'POST';
+    mockReq.headers = { host: 'localhost:3000' };
+    const mockRes: any = new EventEmitter();
+    mockRes.writeHead = (c: number) => {
+      status = c;
+    };
+    mockRes.end = (content: string) => {
+      body = content;
+      assert.equal(status, 403);
+      assert.ok(body.includes('not permitted'));
+      done();
+    };
+    (server as any).handleRequest(mockReq, mockRes);
+    mockReq.emit('data', JSON.stringify({ url: 'http://169.254.169.254/latest/meta-data/' }));
+    mockReq.emit('end');
   });
 });

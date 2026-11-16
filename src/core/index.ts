@@ -28,3 +28,4 @@ export {
 export * from './bankruptcy.ts';
 export * from './validation.ts';
 export * from './settlement.ts';
+export * from './staking.ts';

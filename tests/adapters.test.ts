@@ -8,6 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MockAdapter,
+  DEFAULT_MOCK_CATALOG,
   OpenAICompatibleAdapter,
   createAgentAdapter,
   extractJsonFromText,
@@ -17,7 +18,7 @@ import {
   type ProblemContext,
 } from '../src/adapters/index.ts';
 import { createAgent } from '../src/core/index.ts';
-import { executeInSandbox } from '../src/oracle/index.ts';
+import { executeInSandbox, executeInSandboxSync } from '../src/oracle/index.ts';
 
 const testProblem: ProblemContext = {
   id: 'is-palindrome',
@@ -257,6 +258,24 @@ test('extractJsonFromText: tolerates trailing commas in objects and arrays emitt
   assert.equal(result.stake, 30);
   assert.equal(result.solution, 'function solve() { return true; }');
   assert.equal(result.reasoning, 'Valid with trailing comma');
+});
+
+test('extractJsonFromText: strips thinking tags emitted by reasoning models like Qwen or DeepSeek', () => {
+  const input = `<think>
+I need to check palindrome edge cases and sanitize non-alphanumeric chars.
+The function isPalindrome should clean string and compare reversed.
+</think>
+\`\`\`json
+{
+  "solution": "function isPalindrome(s) { const clean = s.toLowerCase().replace(/[^a-z0-9]/g, ''); return clean === clean.split('').reverse().join(''); }",
+  "stake": 25,
+  "reasoning": "Normalized palindrome check"
+}
+\`\`\``;
+  const result = extractJsonFromText(input) as any;
+  assert.equal(result.stake, 25);
+  assert.ok(result.solution.includes('isPalindrome'));
+  assert.equal(result.reasoning, 'Normalized palindrome check');
 });
 
 test('createAgentAdapter: dynamically routes to OpenAICompatibleAdapter when agent has dedicated apiKey', () => {
@@ -510,6 +529,44 @@ test('OpenAICompatibleAdapter: Handles 400 response_format rejection with seamle
   assert.equal(proposal.stake, 10);
 });
 
+test('OpenAICompatibleAdapter: Routes Ollama local models to native /api/chat with think:false', async () => {
+  let calledUrl = '';
+  let calledBody: any = null;
+
+  const mockFetch: typeof fetch = async (url, init) => {
+    calledUrl = String(url);
+    calledBody = JSON.parse(String(init?.body));
+    // Simulate Ollama /api/chat non-streaming response
+    return new Response(
+      JSON.stringify({
+        model: 'qwen3.5:4b',
+        message: {
+          role: 'assistant',
+          content: '{"solution": "function isPalindrome(s) { return true; }", "stake": 25, "reasoning": "Direct"}',
+        },
+        done: true,
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  };
+
+  const adapter = new OpenAICompatibleAdapter({
+    model: 'qwen3.5:4b',
+    fetchFn: mockFetch,
+  });
+
+  const agent = createAgent({ id: 'QwenGen', role: 'GENERATOR', model: 'qwen3.5:4b', capital: 100 });
+  const proposal = await adapter.generateProposal({ agent, problem: testProblem });
+
+  // Must use native /api/chat endpoint
+  assert.ok(calledUrl.includes('/api/chat'), `Expected /api/chat, got: ${calledUrl}`);
+  // Must send think:false to disable reasoning loops
+  assert.equal(calledBody.think, false);
+  assert.equal(proposal.solution, 'function isPalindrome(s) { return true; }');
+  assert.equal(proposal.stake, 25);
+  assert.equal(proposal.reasoning, 'Direct');
+});
+
 // ---------------------------------------------------------------------------
 // 4. Dynamic Model Resolution Tests
 // ---------------------------------------------------------------------------
@@ -604,15 +661,63 @@ test('resolveDefaultModel: falls back to gpt-4o-mini when non-AIza key and non-1
   }
 });
 
-test('normalizeModelName: upgrades retired gemini-2.5 models to gemini-3.5-flash-lite and strips models/ prefix', () => {
-  assert.equal(normalizeModelName('gemini-2.5-flash'), 'gemini-3.5-flash-lite');
-  assert.equal(normalizeModelName('gemini-2.5-flash-lite'), 'gemini-3.5-flash-lite');
-  assert.equal(normalizeModelName('models/gemini-2.5-flash-lite'), 'gemini-3.5-flash-lite');
+test('normalizeModelName: preserves model name and strips models/ prefix without fake aliases', () => {
   assert.equal(normalizeModelName('models/gemini-3.5-flash-lite'), 'gemini-3.5-flash-lite');
+  assert.equal(normalizeModelName('models/gemini-3.8-flash'), 'gemini-3.8-flash');
+  assert.equal(normalizeModelName('models/gemini-4-hydrogen'), 'gemini-4-hydrogen');
   assert.equal(normalizeModelName('  gemini-2.5-flash  '), 'gemini-3.5-flash-lite');
-  assert.equal(normalizeModelName('gemini-1.5-flash'), 'gemini-1.5-flash');
+  assert.equal(normalizeModelName('gemini-3.8-flash'), 'gemini-3.8-flash');
   assert.equal(normalizeModelName('gpt-4o'), 'gpt-4o');
   assert.equal(normalizeModelName('llama3.2'), 'llama3.2');
+});
+
+test('createAgentAdapter: smartly resolves providerKeys based on model family', () => {
+  const geminiAgent = createAgent({ id: 'Gemini1', role: 'GENERATOR', model: 'gemini-1.5-flash', capital: 100 });
+  const openAiAgent = createAgent({ id: 'OpenAI1', role: 'AUDITOR', model: 'gpt-4o-mini', capital: 100 });
+  const ollamaAgent = createAgent({ id: 'Ollama1', role: 'GENERATOR', model: 'qwen3.5:4b', capital: 100 });
+
+  const providerKeys = {
+    gemini: 'AIzaSyGeminiKey999',
+    openai: 'sk-proj-OpenAiKey888',
+  };
+
+  const adapterGemini = createAgentAdapter(geminiAgent, { providerKeys }) as any;
+  assert.equal(adapterGemini.apiKey, 'AIzaSyGeminiKey999');
+
+  const adapterOpenAI = createAgentAdapter(openAiAgent, { providerKeys }) as any;
+  assert.equal(adapterOpenAI.apiKey, 'sk-proj-OpenAiKey888');
+
+  const adapterOllama = createAgentAdapter(ollamaAgent, { providerKeys }) as any;
+  assert.equal(adapterOllama.apiKey, undefined);
+  assert.ok(adapterOllama.baseUrl.includes('11434'));
+});
+
+test('createAgentAdapter: never routes gemini or openai models to local Ollama even if baseUrl is Ollama', () => {
+  const geminiAgentWithOllamaUrl = createAgent({
+    id: 'GeminiPolluted',
+    role: 'GENERATOR',
+    model: 'gemini-2.0-flash',
+    capital: 100,
+    baseUrl: 'http://127.0.0.1:11434/v1',
+  });
+
+  const adapter = createAgentAdapter(geminiAgentWithOllamaUrl, {
+    globalBaseUrl: 'http://127.0.0.1:11434/v1',
+    providerKeys: { gemini: 'AIzaSyGoogleKey123' },
+  }) as any;
+
+  assert.equal(adapter.apiKey, 'AIzaSyGoogleKey123');
+  assert.equal(adapter.resolveBaseUrlForModel(), 'https://generativelanguage.googleapis.com/v1beta/openai');
+});
+
+test('OpenAICompatibleAdapter: resolveBaseUrlForModel routes gemini to Google even if customBaseUrl is Ollama', () => {
+  const adapter = new OpenAICompatibleAdapter({
+    model: 'gemini-2.0-flash',
+    apiKey: 'AQ.TestKey',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+  });
+
+  assert.equal(adapter.resolveBaseUrlForModel(), 'https://generativelanguage.googleapis.com/v1beta/openai');
 });
 
 test('OpenAICompatibleAdapter: preserves agent model even when agent specifies gemini-3.5-flash-lite', async () => {
@@ -664,8 +769,9 @@ test('OpenAICompatibleAdapter: routes Ollama models to localhost:11434', () => {
 });
 
 test('getModelFallbacks: returns fallback candidates for models', () => {
-  assert.deepEqual(getModelFallbacks('gemini-3.8-flash'), ['gemini-1.5-flash', 'gemini-2.0-flash']);
-  assert.deepEqual(getModelFallbacks('gemini-2.0-flash'), ['gemini-1.5-flash']);
+  assert.deepEqual(getModelFallbacks('gemini-3.8-flash'), ['gemini-3.5-flash-lite', 'gemini-3.6-flash']);
+  assert.deepEqual(getModelFallbacks('gemini-4-argon'), ['gemini-4-hydrogen', 'gemini-3.8-flash', 'gemini-3.5-flash-lite']);
+  assert.deepEqual(getModelFallbacks('gemini-2.0-flash'), ['gemini-3.8-flash', 'gemini-4-hydrogen']);
   assert.deepEqual(getModelFallbacks('gpt-4o'), ['gpt-4o-mini']);
   assert.deepEqual(getModelFallbacks('llama3.2'), []);
 });
@@ -815,4 +921,87 @@ test('OpenAICompatibleAdapter: strictly retries the exact chosen model without s
   assert.equal(attemptedModels.length, 2);
   assert.ok(attemptedModels.every((m) => m === 'gemini-3.8-flash'));
   assert.equal(proposal.agentId, 'AlphaGen');
+});
+
+test('OpenAICompatibleAdapter: aborts immediately on plan restriction (limit: 0) without wasteful retries', async () => {
+  let callCount = 0;
+  const mockFetch: typeof fetch = async () => {
+    callCount++;
+    return new Response(
+      JSON.stringify({
+        error: {
+          code: 429,
+          message:
+            "Quota exceeded for quota metric 'Generate Content Requests' and limit '0' of service 'generativelanguage.googleapis.com'",
+          status: 'RESOURCE_EXHAUSTED',
+        },
+      }),
+      { status: 429, headers: { 'Content-Type': 'application/json' } }
+    );
+  };
+
+  const adapter = new OpenAICompatibleAdapter({
+    model: 'gemini-4-carbon',
+    apiKey: 'AQ.TestKey',
+    maxRetries: 3,
+    retryDelayMs: 10,
+    fetchFn: mockFetch,
+  });
+
+  const agent = createAgent({
+    id: 'CarbonGen',
+    role: 'GENERATOR',
+    model: 'gemini-4-carbon',
+    capital: 100,
+  });
+
+  await assert.rejects(
+    async () => {
+      await adapter.generateProposal({ agent, problem: testProblem });
+    },
+    (err: Error) => {
+      assert.ok(err.message.includes('Plan Restriction (Free Tier Limit: 0)'));
+      assert.ok(err.message.includes('gemini-4-carbon'));
+      assert.ok(err.message.includes('requires a paid billing account'));
+      return true;
+    }
+  );
+
+  // Exactly 1 attempt made, aborted immediately without 3 wasteful retries
+  assert.equal(callCount, 1);
+});
+
+test('DEFAULT_MOCK_CATALOG: All 10 catalog entries verified against flawChallenge inputs (solid passes, buggy fails)', () => {
+  const problemIds = Object.keys(DEFAULT_MOCK_CATALOG);
+  assert.equal(problemIds.length, 10, `Expected exactly 10 problems in DEFAULT_MOCK_CATALOG, got ${problemIds.length}`);
+
+  for (const id of problemIds) {
+    const entry = DEFAULT_MOCK_CATALOG[id];
+    assert.ok(entry, `Catalog entry for '${id}' must exist`);
+    assert.ok(entry.solid, `Solid definition for '${id}' must exist`);
+    assert.ok(entry.buggy, `Buggy definition for '${id}' must exist`);
+    assert.ok(entry.flawChallenge, `Flaw challenge for '${id}' must exist`);
+
+    const solidResult = executeInSandboxSync(
+      entry.solid.solution,
+      entry.flawChallenge.testInput,
+      entry.flawChallenge.expectedOutput
+    );
+    assert.equal(
+      solidResult.passed,
+      true,
+      `Solid solution for '${id}' must PASS flawChallenge input (${JSON.stringify(entry.flawChallenge.testInput)} -> expected ${JSON.stringify(entry.flawChallenge.expectedOutput)}). Got verdict ${solidResult.verdict}, actual: ${JSON.stringify(solidResult.actualOutput)}`
+    );
+
+    const buggyResult = executeInSandboxSync(
+      entry.buggy.solution,
+      entry.flawChallenge.testInput,
+      entry.flawChallenge.expectedOutput
+    );
+    assert.equal(
+      buggyResult.passed,
+      false,
+      `Buggy solution for '${id}' must FAIL flawChallenge input (${JSON.stringify(entry.flawChallenge.testInput)} -> expected ${JSON.stringify(entry.flawChallenge.expectedOutput)}). Got verdict ${buggyResult.verdict}, actual: ${JSON.stringify(buggyResult.actualOutput)}`
+    );
+  }
 });
