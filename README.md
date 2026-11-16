@@ -21,7 +21,7 @@
 </p>
 
 [![Tests](https://img.shields.io/badge/tests-194%20passing-brightgreen.svg)](tests/)
-[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Dependencies](https://img.shields.io/badge/dependencies-zero-success.svg)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-black.svg)](package.json)
 
@@ -339,4 +339,4 @@ nash-gate/
 
 ## 📄 License
 
-GNU Affero General Public License v3.0 (AGPL-3.0) © 2026 NashGate Authors
+Apache License 2.0 (Apache-2.0) © 2026 Iván Murguiondo Azpilicueta
