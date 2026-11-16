@@ -6,7 +6,19 @@
 
 > **A deterministic consensus and arbitration engine for multi-agent AI systems, grounded in Game Theory and Mechanism Design.**
 
-![NashGate Real-Time Consensus Dashboard](assets/nash-gate-demo.gif)
+<p align="center">
+  <img src="assets/nash-gate-demo-chart.gif" alt="NashGate Real-Time Capital Evolution" width="100%" />
+</p>
+<p align="center">
+  <em>Real-time Multi-Agent Capital Evolution and Asymmetric Payoff Settlements</em>
+</p>
+
+<p align="center">
+  <img src="assets/nash-gate-demo-events.gif" alt="NashGate Live Deterministic Oracle Feed" width="100%" />
+</p>
+<p align="center">
+  <em>Live Sandboxed Oracle Verifications, Code Proposals, and Game-Theoretic Liquidation Events</em>
+</p>
 
 [![Tests](https://img.shields.io/badge/tests-194%20passing-brightgreen.svg)](tests/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)

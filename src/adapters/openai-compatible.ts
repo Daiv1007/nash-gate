@@ -766,26 +766,12 @@ export class OpenAICompatibleAdapter implements AgentAdapter {
   async generateProposal(params: GenerateProposalParams): Promise<Proposal> {
     const { agent, problem } = params;
 
-    const isPragmaticFast = /buggy|fast|quick|heuristic|pragmatic|lean|naive/i.test(agent.id);
-
-    const personaDirective = isPragmaticFast
-      ? `ENGINEERING PHILOSOPHY (Lean & High-Performance): You represent '${agent.id}'.
-Your priority is clean, concise, idiomatic code and execution speed.
-Implement an elegant, direct solution without bloated defensive boilerplate or speculative over-engineering.
-Focus strictly on the core functional requirements stated in the task.`
-      : `ENGINEERING PHILOSOPHY (High-Assurance & Defensive): You represent '${agent.id}'.
-Your priority is maximum robustness and mission-critical verification.
-Anticipate unusual corner cases, inverted parameters, degenerate inputs, and extreme boundary conditions.
-Your goal is to survive adversarial fuzzing and earn resilience dividends (+50%).`;
-
-    const systemPrompt = `You are participating as a GENERATOR agent in the NashGate consensus protocol.
-${personaDirective}
-
-Your task is to write a pure, deterministic JavaScript function that implements the requested task.
+    const systemPrompt = `You are a software engineer participating as a GENERATOR agent in the NashGate consensus protocol.
+Your task is to write a pure, deterministic JavaScript function that solves the given problem specification.
 You must stake reputation capital on your solution.
 Game-theoretic payoff rules:
 - If your solution fails an auditor's test case, you forfeit your ENTIRE stake to the auditor.
-- If unchallenged, you earn a +10% dividend.
+- If unchallenged, you earn a +10% dividend on your stake.
 - If challenged and your code survives, you earn a +50% resilience bonus.
 
 Output strictly valid JSON with this exact schema:
@@ -890,29 +876,14 @@ Start response directly with '{':`;
   async generateChallenge(params: GenerateChallengeParams): Promise<Challenge | null> {
     const { auditor, targetGenerator, proposal, problem } = params;
 
-    const isRecklessAuditor = /reckless|aggressive|bounty|speculative|gambler/i.test(auditor.id);
-    const isSharpAuditor = /sharp|rigorous|analytical|expert|hawk/i.test(auditor.id);
+    const systemPrompt = `You are an auditor participating in the NashGate consensus protocol.
+Your role is to inspect the proposed JavaScript code against the problem specification.
+You must decide whether to CHALLENGE the solution or DECLINE.
 
-    const auditorPersonaDirective = isRecklessAuditor
-      ? `AUDITOR PROFILE (Adversarial Fuzzer / High Risk):
-You are an adversarial test engineer with high risk appetite seeking the generator's +${proposal.stake} bounty.
-Actively probe boundary extremes, unexpected input structures, zero values, negative ranges, and type coercion.
-Challenge (shouldChallenge: true) whenever you identify an untested assumption or possible oversight in the generator's implementation.`
-      : `AUDITOR PROFILE (Formal Verification Engineer):
-You are a formal verification auditor. Inspect the code contract against implicit and explicit invariants.
-Verify whether the algorithm correctly handles general mathematical and data structure edge cases:
-- Boundary inversion or parameter ordering
-- Degenerate/empty collections
-- Deeply nested structures vs single-level operations
-- Unicode, punctuation, and casing
-If you find a reproducible counterexample where the code returns wrong output or throws an unhandled error, challenge (shouldChallenge: true) with the exact testInput and expectedOutput to capture the generator's ${proposal.stake} bounty.
-If the solution is fully sound and handles all invariants, decline (shouldChallenge: false) to preserve your capital.`;
-
-    const systemPrompt = `You are an adversarial test engineer participating as an AUDITOR agent in the NashGate consensus protocol.
-${auditorPersonaDirective}
-
-Game-theoretic rule: If your challenge successfully breaks the generator's solution, you win the generator's staked capital (+${proposal.stake}) as a bounty.
-HOWEVER, if your challenge is a FALSE POSITIVE (the generator passes), you suffer an asymmetric anti-spam penalty of -1.5x your stake (-1.5 * stake).
+Game-theoretic payoff rules:
+- If you challenge and the generator's code FAILS your test, you win the generator's staked capital (+${proposal.stake}) as a bounty.
+- If you challenge and the generator's code PASSES your test (false positive / spam), you suffer an asymmetric penalty of -1.5x your stake (-1.5 * stake).
+- If the solution is robust and correct, DECLINE to challenge (shouldChallenge: false) to protect your capital.
 
 Output strictly valid JSON with this exact schema:
 {
