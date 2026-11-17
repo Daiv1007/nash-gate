@@ -278,7 +278,13 @@ export class OpenAICompatibleAdapter implements AgentAdapter {
       this.customBaseUrl = trimTrailingSlashes(process.env.LLM_BASE_URL);
     }
 
-    this.defaultModel = config?.model ? normalizeModelName(config.model) : resolveDefaultModel();
+    const explicitGeminiKey = config?.apiKey?.startsWith('AIza') ||
+      config?.apiKey?.startsWith('AQ.');
+    this.defaultModel = config?.model
+      ? normalizeModelName(config.model)
+      : explicitGeminiKey
+        ? 'gemini-3.5-flash-lite'
+        : resolveDefaultModel();
     this.temperature = config?.temperature ?? 0.2;
 
     const targetModelLower = this.defaultModel.toLowerCase();
