@@ -20,10 +20,13 @@
   <em>Live Sandboxed Oracle Verifications, Code Proposals, and Game-Theoretic Liquidation Events</em>
 </p>
 
-[![Tests](https://img.shields.io/badge/tests-194%20passing-brightgreen.svg)](tests/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Dependencies](https://img.shields.io/badge/dependencies-zero-success.svg)](package.json)
-[![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-black.svg)](package.json)
+<p align="center">
+  <a href="https://github.com/Daiv1007/nash-gate/stargazers"><img src="https://img.shields.io/github/stars/Daiv1007/nash-gate?style=social" alt="GitHub stars" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-194%20passing-brightgreen.svg" alt="Tests" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License" /></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/dependencies-zero-success.svg" alt="Dependencies" /></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/node-%3E%3D22.0.0-black.svg" alt="Node" /></a>
+</p>
 
 ---
 
@@ -334,6 +337,12 @@ nash-gate/
 - **Strict Separation of Concerns:** `/src/core/` is completely pure. No `fetch` calls, network I/O, or model SDKs are permitted inside settlement equations.
 - **Zero Framework Dependency:** The web visualizer in `/src/server/` relies purely on Node's native `http` module and Server-Sent Events (SSE).
 - **Mathematical Transparency:** Payoff formulas reflect formal mechanism design principles to guarantee game-theoretic stability.
+
+---
+
+## ⭐ Star History & Community
+
+If you find NashGate's game-theoretic approach to multi-agent consensus compelling, please consider starring the repository! It helps more developers, researchers, and AI builders discover the project.
 
 ---
 

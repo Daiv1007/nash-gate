@@ -26,7 +26,14 @@
     "game-theory",
     "consensus",
     "multi-agent",
-    "arbitration"
+    "arbitration",
+    "mechanism-design",
+    "nash-equilibrium",
+    "ai-safety",
+    "staking",
+    "llm",
+    "gemini",
+    "ollama"
   ],
   "author": "Iván Murguiondo Azpilicueta <ivandavidaras@gmail.com>",
   "license": "Apache-2.0",
