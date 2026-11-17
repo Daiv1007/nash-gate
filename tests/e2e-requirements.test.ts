@@ -967,18 +967,17 @@ describe('Tier 4: Real-World Application Scenarios', () => {
 
   it('Tier 4.5: Frontend dependency audit: index.html contains no external CDN or third-party script tags', () => {
     const html = fs.readFileSync(HTML_FILE_PATH, 'utf-8');
-    const matches = html.match(/<script[^>]*src=["']([^"']+)["'][^>]*>/gi) || [];
+    const matches = Array.from(html.matchAll(/<script[^>]*src=["']([^"']+)["'][^>]*>/gi));
 
-    for (const tag of matches) {
+    for (const match of matches) {
+      const src = (match[1] || '').trim().toLowerCase();
       const isExternal =
-        tag.includes('http://') ||
-        tag.includes('https://') ||
-        tag.includes('unpkg.com') ||
-        tag.includes('cdn.jsdelivr.net') ||
-        tag.includes('cdnjs.cloudflare.com');
+        src.startsWith('http://') ||
+        src.startsWith('https://') ||
+        src.startsWith('//');
       assert.ok(
         !isExternal,
-        `Dashboard index.html contains disallowed external script tag: ${tag}`
+        `Dashboard index.html contains disallowed external script tag src: ${src}`
       );
     }
   });

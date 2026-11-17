@@ -81,10 +81,21 @@ export function preprocessCode(rawCode: string): string {
 
   let code = rawCode.trim();
 
-  // 1. Strip Markdown code fences if present (including fences surrounded by commentary)
-  const fenceMatch = code.match(/```(?:[a-zA-Z0-9_-]+)?\s*([\s\S]*?)\s*```/);
-  if (fenceMatch) {
-    code = fenceMatch[1].trim();
+  // 1. Strip Markdown code fences if present without polynomial regex (indexOf is O(N) and immune to ReDoS)
+  const startFence = code.indexOf('```');
+  if (startFence !== -1) {
+    const endFence = code.indexOf('```', startFence + 3);
+    if (endFence !== -1) {
+      let inner = code.substring(startFence + 3, endFence);
+      const firstNewline = inner.indexOf('\n');
+      if (firstNewline !== -1) {
+        const firstLine = inner.substring(0, firstNewline).trim();
+        if (/^[a-zA-Z0-9_-]+$/.test(firstLine)) {
+          inner = inner.substring(firstNewline + 1);
+        }
+      }
+      code = inner.trim();
+    }
   }
 
   // 2. Strip TypeScript types natively

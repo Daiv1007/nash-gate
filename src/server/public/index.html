@@ -2552,11 +2552,9 @@
         }
 
         if (apiKey) {
-          sessionStorage.setItem('nashgate_key_' + id, apiKey);
           agentKeyOverrides[id] = apiKey;
         }
         if (baseUrl) {
-          sessionStorage.setItem('nashgate_url_' + id, baseUrl);
           agentUrlOverrides[id] = baseUrl;
         }
         agentModelOverrides[id] = model;
@@ -2688,18 +2686,14 @@
       const urlVal = document.getElementById('keyModalBaseUrl').value.trim();
 
       if (keyVal) {
-        sessionStorage.setItem('nashgate_key_' + agentId, keyVal);
         agentKeyOverrides[agentId] = keyVal;
       } else {
-        sessionStorage.removeItem('nashgate_key_' + agentId);
         delete agentKeyOverrides[agentId];
       }
 
       if (urlVal) {
-        sessionStorage.setItem('nashgate_url_' + agentId, urlVal);
         agentUrlOverrides[agentId] = urlVal;
       } else {
-        sessionStorage.removeItem('nashgate_url_' + agentId);
         delete agentUrlOverrides[agentId];
       }
 
@@ -2918,8 +2912,6 @@
         const validModels = filterValidGeminiModels(rawModels);
 
         providerKeysState.gemini = key;
-        localStorage.setItem('nashgate_key_gemini', key);
-        sessionStorage.setItem('nashgate_key_gemini', key);
         providerCatalog.gemini = validModels;
 
         if (badge) {
@@ -3053,8 +3045,6 @@
         const models = filtered.length > 0 ? filtered : ['gpt-4o-mini', 'gpt-4o', 'o3-mini'];
 
         providerKeysState.openai = key;
-        localStorage.setItem('nashgate_key_openai', key);
-        sessionStorage.setItem('nashgate_key_openai', key);
         providerCatalog.openai = [...new Set(models)];
 
         if (badge) {
@@ -3322,15 +3312,11 @@
       if (inpGemini) {
         const gemVal = inpGemini.value.trim();
         providerKeysState.gemini = gemVal;
-        if (gemVal) localStorage.setItem('nashgate_key_gemini', gemVal);
-        else localStorage.removeItem('nashgate_key_gemini');
       }
 
       if (inpOpenAi) {
         const oaiVal = inpOpenAi.value.trim();
         providerKeysState.openai = oaiVal;
-        if (oaiVal) localStorage.setItem('nashgate_key_openai', oaiVal);
-        else localStorage.removeItem('nashgate_key_openai');
       }
 
       populateAllModelSelects();
@@ -4579,10 +4565,8 @@
       if (legacyKey) {
         if ((legacyKey.startsWith('AIza') || legacyKey.startsWith('AQ.')) && !providerKeysState.gemini) {
           providerKeysState.gemini = legacyKey;
-          localStorage.setItem('nashgate_key_gemini', legacyKey);
         } else if (legacyKey.startsWith('sk-') && !providerKeysState.openai) {
           providerKeysState.openai = legacyKey;
-          localStorage.setItem('nashgate_key_openai', legacyKey);
         }
       }
 

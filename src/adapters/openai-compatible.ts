@@ -146,16 +146,22 @@ export function extractJsonFromText(rawText: string): unknown {
     return JSON.parse(stripTrailingCommas(text));
   } catch {}
 
-  // 2. Strip Markdown code fences: ```json ... ``` or ``` ... ```
-  const fencedMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  if (fencedMatch) {
-    const fencedContent = fencedMatch[1].trim();
-    try {
-      return JSON.parse(fencedContent);
-    } catch {}
-    try {
-      return JSON.parse(stripTrailingCommas(fencedContent));
-    } catch {}
+  // 2. Strip Markdown code fences without polynomial regex (indexOf is O(N) and immune to ReDoS)
+  const firstFence = text.indexOf('```');
+  if (firstFence !== -1) {
+    const secondFence = text.indexOf('```', firstFence + 3);
+    if (secondFence !== -1) {
+      let fencedContent = text.substring(firstFence + 3, secondFence).trim();
+      if (fencedContent.startsWith('json')) {
+        fencedContent = fencedContent.substring(4).trim();
+      }
+      try {
+        return JSON.parse(fencedContent);
+      } catch {}
+      try {
+        return JSON.parse(stripTrailingCommas(fencedContent));
+      } catch {}
+    }
   }
 
   // 3. Locate outermost curly brackets: { ... }
@@ -258,10 +264,18 @@ export class OpenAICompatibleAdapter implements AgentAdapter {
   constructor(config?: OpenAICompatibleAdapterConfig) {
     this.name = config?.name ?? 'OpenAICompatibleAdapter';
 
+    const trimTrailingSlashes = (url: string) => {
+      let u = url.trim();
+      while (u.endsWith('/')) {
+        u = u.slice(0, -1);
+      }
+      return u;
+    };
+
     if (config?.baseUrl) {
-      this.customBaseUrl = config.baseUrl.replace(/\/+$/, '');
+      this.customBaseUrl = trimTrailingSlashes(config.baseUrl);
     } else if (process.env.LLM_BASE_URL) {
-      this.customBaseUrl = process.env.LLM_BASE_URL.replace(/\/+$/, '');
+      this.customBaseUrl = trimTrailingSlashes(process.env.LLM_BASE_URL);
     }
 
     this.defaultModel = config?.model ? normalizeModelName(config.model) : resolveDefaultModel();

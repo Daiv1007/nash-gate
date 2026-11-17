@@ -1002,11 +1002,12 @@ export class DashboardServer {
 
           const host = parsedTarget.hostname.toLowerCase();
           const isLocalOllama = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+          const isAllowedDomain = (domain: string) => host === domain || host.endsWith('.' + domain);
           const isAllowedCloud =
-            host.endsWith('googleapis.com') ||
-            host.endsWith('openai.com') ||
-            host.endsWith('groq.com') ||
-            host.endsWith('anthropic.com');
+            isAllowedDomain('googleapis.com') ||
+            isAllowedDomain('openai.com') ||
+            isAllowedDomain('groq.com') ||
+            isAllowedDomain('anthropic.com');
 
           if (!isLocalOllama && !isAllowedCloud) {
             res.writeHead(403, { 'Content-Type': 'application/json' });
