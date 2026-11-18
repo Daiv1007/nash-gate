@@ -21,8 +21,10 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Daiv1007/nash-gate/actions/workflows/test.yml"><img src="https://github.com/Daiv1007/nash-gate/actions/workflows/test.yml/badge.svg" alt="CI Test Suite" /></a>
   <a href="https://github.com/Daiv1007/nash-gate/stargazers"><img src="https://img.shields.io/github/stars/Daiv1007/nash-gate?style=social" alt="GitHub stars" /></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-194%20passing-brightgreen.svg" alt="Tests" /></a>
+  <a href="SECURITY.md"><img src="https://img.shields.io/badge/security-0%20CodeQL%20alerts-brightgreen.svg" alt="Security" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License" /></a>
   <a href="package.json"><img src="https://img.shields.io/badge/dependencies-zero-success.svg" alt="Dependencies" /></a>
   <a href="package.json"><img src="https://img.shields.io/badge/node-%3E%3D22.0.0-black.svg" alt="Node" /></a>
@@ -124,8 +126,10 @@ NashGate requires Node.js v22+ and has **zero external production dependencies**
 git clone https://github.com/Daiv1007/nash-gate.git
 cd nash-gate
 npm test
+npm run typecheck
 ```
-All 194 unit, oracle, adapter, settlement, and server tests will run with sub-second execution.
+
+All 194 unit, oracle, adapter, settlement, and server tests run natively with sub-second execution.
 
 ### 2. Interactive CLI Demo
 
@@ -153,6 +157,20 @@ Initial Agents Roster:
 └──────────────────┴─────────────┴──────────────────────────┴──────────┴──────────┘
 ```
 
+#### CLI Command-Line Flags
+
+Customize the tournament directly from your shell:
+
+| Flag | Description | Default |
+| :--- | :--- | :--- |
+| `--model=<model>` | Global model fallback for all agents | Auto-detected |
+| `--alpha-model=<model>` | Dedicated model for `AlphaGen` | `gemini-3.5-flash-lite` |
+| `--buggy-model=<model>` | Dedicated model for `BuggyGen` | `gpt-4o-mini` |
+| `--sharp-model=<model>` | Dedicated model for `SharpAuditor` | `gemini-3.5-flash-lite` |
+| `--reckless-model=<model>` | Dedicated model for `RecklessAuditor` | `llama3.2` |
+| `--pace-ms=<ms>` | Animation pacing delay between steps in milliseconds | `600` |
+| `--help` | Display CLI flag documentation and usage examples | - |
+
 ### 3. Real-Time Web Visualizer
 
 Launch the native zero-framework dashboard:
@@ -177,7 +195,89 @@ Output:
 Open `http://localhost:3000` in any browser to watch:
 - **Live Agent Cards** with real-time animated capital progress bars, dynamic ROI percentage badges, and ACTIVE / BANKRUPT indicators.
 - **Live Round & Oracle Feed** streaming submitted TypeScript/JavaScript code, adversarial test inputs, execution durations ($ms$), and color-coded capital transfer logs ($+\text{bounties}$ vs $-1.5\times\text{penalties}$).
-- **Interactive Controls** to trigger or replay tournaments directly from the web interface.
+- **Interactive Controls** to trigger, customize, or replay tournaments directly from the web interface.
+
+---
+
+## 💻 Programmatic Usage (TypeScript SDK)
+
+NashGate exposes clean, zero-dependency sub-module entry points configured in `package.json`:
+
+```ts
+import { runTournament, createAgent, MockAdapter } from 'nash-gate';
+import { evaluateChallenge } from 'nash-gate/oracle';
+import { settleRound } from 'nash-gate/core';
+```
+
+### 1. Multi-Agent Tournament Orchestration
+
+```ts
+import { runTournament, MockAdapter, type Agent, type ProblemContext } from 'nash-gate';
+
+const agents: Agent[] = [
+  { id: 'Agent-A', role: 'GENERATOR', model: 'solid-algo', capital: 100, status: 'ACTIVE' },
+  { id: 'Agent-B', role: 'AUDITOR', model: 'verifier', capital: 100, status: 'ACTIVE' }
+];
+
+const problems: ProblemContext[] = [
+  {
+    id: 'palindrome',
+    task: 'Write isPalindrome(str: string): boolean that ignores punctuation and casing.',
+    referenceTestCases: [{ input: 'RaceCar', expected: true }]
+  }
+];
+
+const result = await runTournament({
+  agents,
+  problems,
+  adapter: new MockAdapter(),
+  maxRounds: 3,
+  hooks: {
+    onRoundEnd: (round) => console.log(`Round ${round.roundNumber} settled!`),
+    onBankruptcy: (agent) => console.warn(`Agent ${agent.id} liquidated.`)
+  }
+});
+
+console.log('Leaderboard:', result.leaderboard);
+```
+
+### 2. Deterministic Sandboxed Oracle Verification
+
+```ts
+import { evaluateChallenge } from 'nash-gate/oracle';
+
+const solution = `
+function isPalindrome(str) {
+  const clean = str.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return clean === clean.split('').reverse().join('');
+}
+`;
+
+const evaluation = await evaluateChallenge({
+  code: solution,
+  testInput: 'A man, a plan, a canal: Panama',
+  expectedOutput: true,
+  timeoutMs: 2000 // Strict timeout guard
+});
+
+console.log(evaluation.verdict); // 'PASSED'
+console.log(`Execution time: ${evaluation.durationMs}ms`);
+```
+
+### 3. Pure Game-Theoretic Round Settlement
+
+```ts
+import { settleRound, type Proposal, type Challenge, type Agent } from 'nash-gate/core';
+
+const settlement = settleRound({
+  proposals: [/* Staked proposals */],
+  challenges: [/* Adversarial challenges */],
+  evaluations: [/* Oracle execution verdicts */],
+  agents: new Map<string, Agent>(/* Agent roster */)
+});
+
+console.log(settlement.balanceUpdates);
+```
 
 ---
 
@@ -211,6 +311,7 @@ npm run demo -- --model=gemini-3.5-flash-lite
 Click the key badge (`🔑`) on any individual agent card to assign a dedicated API key or custom endpoint specifically to that agent.
 
 ### Freedom of Model Selection & Tier Transparency
+
 Users are not locked into any default models. You have total freedom to specify:
 1. **In the Web Visualizer (`npm run ui`)**:
    - **Per-Agent Model Selectors**: Configure models directly on each agent card, organized cleanly by tiers:
@@ -230,17 +331,14 @@ Users are not locked into any default models. You have total freedom to specify:
    - `export LLM_MODEL="<your-model>"`
 
 ### Dynamic Multi-Agent Roster & Per-Agent API Keys
+
 NashGate allows complete customization of the competing multi-agent economy:
 - **Per-Agent API Keys:** Instead of a single global key, you can assign dedicated API keys and base URLs to each individual agent. For example, Agent 1 can use Google Gemini with an AI Studio key, Agent 2 can run OpenAI with a Project Key, and Agent 3 can query a local Ollama instance on `http://localhost:11434/v1`.
 - **Dynamic Agent Creation:** Add custom agents at any time via the **+ Add Agent** button in the web visualizer or the REST API (`POST /api/agents`), configuring their ID, role, initial capital, model, and optional credentials.
 - **Dynamic Role Assignment:** Easily switch agents between `GENERATOR` and `AUDITOR` roles with a single click (`⇄` toggle) to experiment with different market equilibriums.
-- **Agent Roster Management API:**
-  - `GET /api/agents` — Fetch current agent roster with sensitive keys masked (`••••••••`).
-  - `POST /api/agents` — Create or update an agent.
-  - `DELETE /api/agents/:id` — Remove an agent from the roster.
-  - `POST /api/agents/reset` — Reset to default 4-agent benchmark setup.
 
 ### Dynamic Model Resolution & Auto-Normalization
+
 When no custom model is explicitly specified, the engine discovers your target provider and default model:
 1. `LLM_MODEL`: Exact model name override.
 2. `LLM_API_KEY` starting with `AIza` or `AQ.` (Google AI Studio formats): Defaults to `gemini-3.5-flash-lite` and routes to Google's OpenAI-compatible endpoint (`https://generativelanguage.googleapis.com/v1beta/openai`).
@@ -279,6 +377,7 @@ npm run demo -- --alpha-model=gpt-4o --buggy-model=gpt-4o-mini --sharp-model=gem
 ```
 
 ### Transient Error Resilience
+
 During high-demand peak hours, commercial LLM APIs occasionally return **HTTP 503 Service Unavailable** ("This model is currently experiencing high demand. Spikes in demand are usually temporary.") or experience socket timeouts. NashGate handles this transparently — **always using the exact model you chose, never substituting**:
 - **Exponential Backoff:** Automatically retries transient 503, 429, 500, 502, 504, and socket timeout errors up to 3 times on the exact chosen model with exponential backoff + jitter (2 s base delay).
 - **No Silent Substitution:** The adapter strictly retries your chosen model. If transient failures persist after all retries, the error surfaces as a visible `engine:error` event in the UI or a red warning in the terminal — never a silent skip.
@@ -286,12 +385,50 @@ During high-demand peak hours, commercial LLM APIs occasionally return **HTTP 50
 - **Reasoning Model Optimization:** For Gemini 3 series models (e.g. `gemini-3.8-flash`), `reasoning_effort: "low"` is automatically sent to suppress lengthy internal reasoning chains and prevent timeouts.
 
 ### Error Telemetry & Fault Visibility
+
 If an API key is invalid, an endpoint is unreachable, or a model is not found:
 - **CLI Demo (`npm run demo`)**: Displays prominent red warnings detailing the agent, model, round, and provider error.
 - **Web UI (`npm run ui`)**: Real-time SSE stream broadcasts `engine:error` events and displays visible error cards in the live activity feed rather than silently skipping rounds.
 
 ### Offline Deterministic Mode (Default)
+
 When live credentials are omitted, NashGate operates in **100% deterministic offline mode** using its built-in algorithmic catalog, enabling end-to-end game-theoretic verification with zero network latency or API expense.
+
+---
+
+## 🌐 REST API & Real-Time SSE Reference
+
+When the visualizer is launched (`npm run ui`), the native HTTP server exposes RESTful endpoints and a high-performance Server-Sent Events stream:
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/` | Responsive dark-mode single-page visualizer. |
+| `GET` | `/events` | Real-time Server-Sent Events (SSE) telemetry stream. |
+| `GET` | `/api/agents` | List current agent roster with masked API keys (`••••••••`). |
+| `POST` | `/api/agents` | Create or update an agent (`id`, `role`, `model`, `capital`, `apiKey`, `baseUrl`). |
+| `DELETE` | `/api/agents/:id` | Remove an agent from the pool. |
+| `POST` | `/api/agents/reset` | Reset the agent pool to the default 4-agent tournament configuration. |
+| `POST` | `/api/tournament/start` | Trigger a new tournament run with optional `paceDelayMs` and `maxRounds`. |
+| `POST` | `/api/tournament/stop` | Gracefully interrupt the active tournament run. |
+
+---
+
+## 🛡️ Security & Hardening Architecture
+
+NashGate is designed for robust adversarial safety and achieves **0 CodeQL alerts** across its codebase:
+
+```mermaid
+flowchart LR
+    Input["Untrusted LLM Output / Code"] --> Sanitize["Linear O(N) AST Preprocessor<br/>(ReDoS Immune)"]
+    Sanitize --> VMSandbox["Isolated Node.js VM Context<br/>(2000ms Hard Timeout)"]
+    VMSandbox --> Guard["Process, Prototype & Mutation Guards"]
+    Guard --> Settle["Deterministic Nash Settlement"]
+```
+
+- **ReDoS Immunity:** Markdown code-fence extraction and AST sanitization use linear $O(N)$ boundary scanning (`indexOf` and substring operations) rather than vulnerable polynomial regular expressions.
+- **Ephemeral In-Memory Credential Safety:** In the web UI, API keys are held strictly in ephemeral JavaScript memory for the active session. Keys are never written to `localStorage` or `sessionStorage`, protecting against token exfiltration via client-side storage scraping.
+- **SSRF Reverse Proxy Defense:** Server-side proxy routing validates destination hosts against an authorized AI domain allowlist (`googleapis.com`, `openai.com`, `groq.com`, `anthropic.com`) and loopback localhost for Ollama, preventing SSRF attacks against internal network metadata endpoints.
+- **Sandboxed Execution Context:** Code runs inside isolated `vm.createContext` boundaries with frozen globals, immutable cloned inputs, and strict 2000ms timeouts that immediately neutralize infinite while/for loops, unresolved promises, and recursive stack exhaustion.
 
 ---
 
@@ -320,7 +457,8 @@ nash-gate/
 │   │   ├── dashboard.ts       # Native Node.js HTTP server & SSE broadcaster
 │   │   └── public/
 │   │       └── index.html     # Dark-mode reactive single-page dashboard
-│   └── demo.ts                # Terminal CLI demonstration
+│   ├── demo.ts                # Terminal CLI demonstration
+│   └── index.ts               # Primary SDK exports and module declarations
 ├── tests/                     # 194 unit, integration, and security tests
 ├── CONTRIBUTING.md            # Guidelines for open-source contributions
 ├── CODE_OF_CONDUCT.md         # Contributor Covenant Code of Conduct v2.1
